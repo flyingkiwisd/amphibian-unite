@@ -15,7 +15,11 @@ import {
   Phone,
   ChevronDown,
   ChevronUp,
+  Plus,
+  Trash2,
 } from 'lucide-react';
+import { useEditableStore } from '@/lib/useEditableStore';
+import { InlineText, InlineNumber, InlineSelect, EditBanner } from '@/components/InlineEdit';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -44,9 +48,9 @@ interface PipelineStage {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock Data
+// Default Data
 // ─────────────────────────────────────────────────────────────────────────────
-const lpData: LP[] = [
+const defaultLPs: LP[] = [
   {
     id: 'lp-1',
     name: 'Summit Capital',
@@ -215,28 +219,74 @@ const alertTypeConfig = {
   info: { bg: 'bg-teal-500/10', border: 'border-teal-500/30', color: 'text-teal-400', icon: CheckCircle },
 };
 
+const statusOptions = [
+  { label: 'Healthy', value: 'Healthy', color: 'bg-success/15 text-success' },
+  { label: 'Watch', value: 'Watch', color: 'bg-warning/15 text-warning' },
+  { label: 'At Risk', value: 'At Risk', color: 'bg-danger/15 text-danger' },
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 export function LPHealthView() {
+  const { data: lpList, setData: setLPList, hasEdits, resetAll } = useEditableStore<LP[]>(
+    'amphibian-unite-lp-health',
+    defaultLPs
+  );
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [expandedLP, setExpandedLP] = useState<string | null>(null);
 
-  const sortedLPs = [...lpData].sort((a, b) => a.healthScore - b.healthScore);
+  const sortedLPs = [...lpList].sort((a, b) => a.healthScore - b.healthScore);
   const filteredLPs =
     filterStatus === 'all'
       ? sortedLPs
       : sortedLPs.filter((lp) => lp.status === filterStatus);
 
-  const avgScore = Math.round(
-    lpData.reduce((sum, lp) => sum + lp.healthScore, 0) / lpData.length
-  );
-  const atRiskCount = lpData.filter((lp) => lp.status === 'At Risk').length;
-  const watchCount = lpData.filter((lp) => lp.status === 'Watch').length;
-  const healthyCount = lpData.filter((lp) => lp.status === 'Healthy').length;
+  const avgScore = lpList.length > 0
+    ? Math.round(lpList.reduce((sum, lp) => sum + lp.healthScore, 0) / lpList.length)
+    : 0;
+  const atRiskCount = lpList.filter((lp) => lp.status === 'At Risk').length;
+  const watchCount = lpList.filter((lp) => lp.status === 'Watch').length;
+  const healthyCount = lpList.filter((lp) => lp.status === 'Healthy').length;
+
+  // ── Update helpers ──
+  const updateLP = (id: string, field: keyof LP, value: string | number) => {
+    setLPList((prev) =>
+      prev.map((lp) => (lp.id === id ? { ...lp, [field]: value } : lp))
+    );
+  };
+
+  const deleteLP = (id: string) => {
+    setLPList((prev) => prev.filter((lp) => lp.id !== id));
+    if (expandedLP === id) setExpandedLP(null);
+  };
+
+  const addLP = () => {
+    const newId = `lp-${Date.now()}`;
+    const newLP: LP = {
+      id: newId,
+      name: 'New LP',
+      aumCommitted: '$0M',
+      investmentDate: 'Mar 2026',
+      healthScore: 50,
+      status: 'Watch',
+      lastContact: 'Today',
+      daysSinceContact: 0,
+      nextAction: 'Schedule intro call',
+      communicationFreq: 50,
+      satisfaction: 50,
+      aumTrend: 'flat',
+      engagement: 50,
+    };
+    setLPList((prev) => [...prev, newLP]);
+    setExpandedLP(newId);
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* ── Edit Banner ── */}
+      <EditBanner hasEdits={hasEdits} onReset={resetAll} />
+
       {/* ── Header ── */}
       <div className="animate-fade-in" style={{ animationDelay: '0ms', opacity: 0 }}>
         <div className="flex items-center gap-3 mb-2">
@@ -324,6 +374,13 @@ export function LPHealthView() {
             {status === 'all' ? 'All LPs' : status}
           </button>
         ))}
+        <button
+          onClick={addLP}
+          className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30 transition-all"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add LP
+        </button>
       </div>
 
       {/* ── LP Cards ── */}
@@ -337,22 +394,31 @@ export function LPHealthView() {
           const isExpanded = expandedLP === lp.id;
 
           return (
-            <button
+            <div
               key={lp.id}
-              onClick={() => setExpandedLP(isExpanded ? null : lp.id)}
               className={`w-full text-left glow-card bg-surface border rounded-xl p-5 transition-all duration-300 hover:border-border-2 ${
                 isExpanded ? config.border : 'border-border'
               }`}
             >
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div
+                className="flex flex-col sm:flex-row sm:items-center gap-4 cursor-pointer"
+                onClick={() => setExpandedLP(isExpanded ? null : lp.id)}
+              >
                 {/* Name & Status */}
                 <div className="flex items-center gap-3 sm:w-56 shrink-0">
                   <StatusIcon className={`w-5 h-5 shrink-0 ${config.color}`} />
                   <div>
-                    <h3 className="text-sm font-semibold text-text-primary">{lp.name}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${config.bg} ${config.color}`}>
-                      {lp.status}
-                    </span>
+                    <h3 className="text-sm font-semibold text-text-primary">
+                      <InlineText
+                        value={lp.name}
+                        onSave={(v) => updateLP(lp.id, 'name', v)}
+                      />
+                    </h3>
+                    <InlineSelect
+                      value={lp.status}
+                      options={statusOptions}
+                      onSave={(v) => updateLP(lp.id, 'status', v)}
+                    />
                   </div>
                 </div>
 
@@ -371,17 +437,27 @@ export function LPHealthView() {
                         style={{ width: `${lp.healthScore}%` }}
                       />
                     </div>
-                    <span className="text-sm font-bold text-text-primary w-8 text-right">
-                      {lp.healthScore}
+                    <span className="text-sm font-bold text-text-primary w-12 text-right">
+                      <InlineNumber
+                        value={lp.healthScore}
+                        onSave={(v) => updateLP(lp.id, 'healthScore', v)}
+                        min={0}
+                        max={100}
+                      />
                     </span>
                   </div>
                 </div>
 
                 {/* Quick Info */}
-                <div className="flex items-center gap-4 sm:w-64 shrink-0">
+                <div className="flex items-center gap-4 sm:w-72 shrink-0">
                   <div className="text-right">
                     <p className="text-xs text-text-muted">AUM</p>
-                    <p className="text-sm font-semibold text-text-primary">{lp.aumCommitted}</p>
+                    <p className="text-sm font-semibold text-text-primary">
+                      <InlineText
+                        value={lp.aumCommitted}
+                        onSave={(v) => updateLP(lp.id, 'aumCommitted', v)}
+                      />
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-text-muted">Last Contact</p>
@@ -392,9 +468,22 @@ export function LPHealthView() {
                           ? 'text-warning'
                           : 'text-text-secondary'
                     }`}>
-                      {lp.lastContact}
+                      <InlineText
+                        value={lp.lastContact}
+                        onSave={(v) => updateLP(lp.id, 'lastContact', v)}
+                      />
                     </p>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteLP(lp.id);
+                    }}
+                    className="p-1.5 rounded-lg text-text-muted/30 hover:text-rose-400 hover:bg-rose-500/10 transition-all opacity-0 group-hover:opacity-100"
+                    title="Delete LP"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                   {isExpanded ? (
                     <ChevronUp className="w-4 h-4 text-text-muted" />
                   ) : (
@@ -417,7 +506,13 @@ export function LPHealthView() {
                         />
                       </div>
                       <span className="text-xs font-mono text-text-primary">
-                        {lp.communicationFreq}%
+                        <InlineNumber
+                          value={lp.communicationFreq}
+                          onSave={(v) => updateLP(lp.id, 'communicationFreq', v)}
+                          suffix="%"
+                          min={0}
+                          max={100}
+                        />
                       </span>
                     </div>
                   </div>
@@ -432,7 +527,13 @@ export function LPHealthView() {
                         />
                       </div>
                       <span className="text-xs font-mono text-text-primary">
-                        {lp.satisfaction}%
+                        <InlineNumber
+                          value={lp.satisfaction}
+                          onSave={(v) => updateLP(lp.id, 'satisfaction', v)}
+                          suffix="%"
+                          min={0}
+                          max={100}
+                        />
                       </span>
                     </div>
                   </div>
@@ -457,11 +558,16 @@ export function LPHealthView() {
                   </div>
                   <div className="bg-surface-2 rounded-lg p-3">
                     <p className="text-xs text-text-muted mb-1">Next Action</p>
-                    <p className="text-xs text-text-secondary">{lp.nextAction}</p>
+                    <p className="text-xs text-text-secondary">
+                      <InlineText
+                        value={lp.nextAction}
+                        onSave={(v) => updateLP(lp.id, 'nextAction', v)}
+                      />
+                    </p>
                   </div>
                 </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

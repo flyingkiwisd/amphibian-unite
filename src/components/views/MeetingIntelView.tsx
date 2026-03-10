@@ -13,8 +13,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
+import { useEditableStore } from '@/lib/useEditableStore';
+import { InlineText, InlineSelect, EditBanner } from '@/components/InlineEdit';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -71,7 +75,7 @@ const formatMeetingDate = (daysOffset: number) => {
   return d.toISOString().split('T')[0];
 };
 
-const mockMeetings: Meeting[] = [
+const defaultMeetings: Meeting[] = [
   {
     id: 'mtg-1',
     title: 'Investment Committee Weekly',
@@ -200,6 +204,13 @@ const typeConfig: Record<Meeting['type'], { color: string; label: string }> = {
   external: { color: 'bg-amber-500/15 text-amber-400 border-amber-500/30', label: 'External' },
 };
 
+const meetingTypeOptions = [
+  { label: 'Strategic', value: 'strategic', color: 'bg-teal-500/15 text-teal-400 border border-teal-500/30' },
+  { label: 'Review', value: 'review', color: 'bg-purple-500/15 text-purple-400 border border-purple-500/30' },
+  { label: 'External', value: 'external', color: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
+  { label: 'Standup', value: 'standup', color: 'bg-blue-500/15 text-blue-400 border border-blue-500/30' },
+];
+
 const formatDisplayDate = (dateStr: string) => {
   const d = new Date(dateStr + 'T12:00:00');
   const todayStr = today.toISOString().split('T')[0];
@@ -216,7 +227,10 @@ const formatDisplayDate = (dateStr: string) => {
 // ── Component ──────────────────────────────────────────────
 
 export function MeetingIntelView() {
-  const [meetings, setMeetings] = useState<Meeting[]>(mockMeetings);
+  const { data: meetings, setData: setMeetings, hasEdits, resetAll } = useEditableStore<Meeting[]>(
+    'amphibian-unite-meeting-intel',
+    defaultMeetings
+  );
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['mtg-1']));
 
   const toggleExpand = (id: string) => {
@@ -239,11 +253,43 @@ export function MeetingIntelView() {
     );
   };
 
+  const updateMeeting = (meetingId: string, updater: (m: Meeting) => Meeting) => {
+    setMeetings((prev) => prev.map((m) => (m.id === meetingId ? updater(m) : m)));
+  };
+
+  const addMeeting = () => {
+    const newId = `mtg-${Date.now()}`;
+    const newMeeting: Meeting = {
+      id: newId,
+      title: 'New Meeting',
+      date: formatMeetingDate(1),
+      time: '10:00 AM',
+      duration: '30 min',
+      attendees: ['james'],
+      type: 'strategic',
+      status: 'upcoming',
+      autoAgenda: [],
+      preReads: [],
+      suggestedOutcomes: [],
+      decisions: [],
+      actionItems: [],
+      notes: '',
+    };
+    setMeetings((prev) => [newMeeting, ...prev]);
+    setExpandedIds((prev) => new Set([...prev, newId]));
+  };
+
+  const deleteMeeting = (meetingId: string) => {
+    setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
+  };
+
   const upcomingMeetings = meetings.filter((m) => m.status === 'upcoming');
   const completedMeetings = meetings.filter((m) => m.status === 'completed');
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <EditBanner hasEdits={hasEdits} onReset={resetAll} />
+
       {/* ── Header ── */}
       <div>
         <div className="flex items-center gap-3 mb-1">
@@ -285,6 +331,15 @@ export function MeetingIntelView() {
         </div>
       </div>
 
+      {/* ── Add Meeting Button ── */}
+      <button
+        onClick={addMeeting}
+        className="flex items-center gap-2 text-sm text-text-muted hover:text-teal-400 transition-colors border border-dashed border-border hover:border-teal-500/40 rounded-xl px-4 py-3 w-full justify-center"
+      >
+        <Plus className="w-4 h-4" />
+        Add New Meeting
+      </button>
+
       {/* ── Upcoming Meetings ── */}
       {upcomingMeetings.length > 0 && (
         <div className="space-y-4">
@@ -304,24 +359,40 @@ export function MeetingIntelView() {
                 style={{ animationDelay: `${100 + idx * 75}ms` }}
               >
                 {/* Meeting header */}
-                <button
-                  onClick={() => toggleExpand(meeting.id)}
-                  className="w-full flex items-center justify-between p-5 hover:bg-surface-2/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
+                <div className="w-full flex items-center justify-between p-5 hover:bg-surface-2/50 transition-colors">
+                  <button
+                    onClick={() => toggleExpand(meeting.id)}
+                    className="flex items-center gap-4 flex-1 text-left"
+                  >
                     <div className="flex flex-col items-center">
                       <span className="text-xs text-text-muted">{formatDisplayDate(meeting.date)}</span>
-                      <span className="text-sm font-bold text-text-primary">{meeting.time}</span>
+                      <span className="text-sm font-bold text-text-primary">
+                        <InlineText
+                          value={meeting.time}
+                          onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, time: v }))}
+                        />
+                      </span>
                     </div>
                     <div className="text-left">
-                      <h4 className="text-base font-semibold text-text-primary">{meeting.title}</h4>
+                      <h4 className="text-base font-semibold text-text-primary">
+                        <InlineText
+                          value={meeting.title}
+                          onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, title: v }))}
+                        />
+                      </h4>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${typeConf.color}`}>
-                          {typeConf.label}
-                        </span>
+                        <InlineSelect
+                          value={meeting.type}
+                          options={meetingTypeOptions}
+                          onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, type: v as Meeting['type'] }))}
+                          className=""
+                        />
                         <span className="text-xs text-text-muted flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {meeting.duration}
+                          <InlineText
+                            value={meeting.duration}
+                            onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, duration: v }))}
+                          />
                         </span>
                         <span className="text-xs text-text-muted flex items-center gap-1">
                           <Users className="w-3 h-3" />
@@ -329,7 +400,7 @@ export function MeetingIntelView() {
                         </span>
                       </div>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-3">
                     {/* Attendee avatars */}
                     <div className="hidden sm:flex -space-x-2">
@@ -343,9 +414,18 @@ export function MeetingIntelView() {
                         );
                       })}
                     </div>
-                    {isExpanded ? <ChevronUp className="w-5 h-5 text-text-muted" /> : <ChevronDown className="w-5 h-5 text-text-muted" />}
+                    <button
+                      onClick={() => deleteMeeting(meeting.id)}
+                      className="p-1 text-text-muted/30 hover:text-rose-400 transition-colors"
+                      title="Delete meeting"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => toggleExpand(meeting.id)}>
+                      {isExpanded ? <ChevronUp className="w-5 h-5 text-text-muted" /> : <ChevronDown className="w-5 h-5 text-text-muted" />}
+                    </button>
                   </div>
-                </button>
+                </div>
 
                 {/* Expanded content */}
                 {isExpanded && (
@@ -368,12 +448,48 @@ export function MeetingIntelView() {
                             <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-surface/50 border border-border/50">
                               <span className="text-xs font-mono text-teal-400 mt-0.5">{i + 1}.</span>
                               <div className="flex-1">
-                                <p className="text-sm text-text-primary">{item.text}</p>
-                                <p className="text-[10px] text-text-muted mt-0.5">Source: {item.source}</p>
+                                <InlineText
+                                  value={item.text}
+                                  onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                    const agenda = [...m.autoAgenda];
+                                    agenda[i] = { ...agenda[i], text: v };
+                                    return { ...m, autoAgenda: agenda };
+                                  })}
+                                  className="text-sm text-text-primary"
+                                />
+                                <p className="text-[10px] text-text-muted mt-0.5">
+                                  Source: <InlineText
+                                    value={item.source}
+                                    onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                      const agenda = [...m.autoAgenda];
+                                      agenda[i] = { ...agenda[i], source: v };
+                                      return { ...m, autoAgenda: agenda };
+                                    })}
+                                  />
+                                </p>
                               </div>
+                              <button
+                                onClick={() => updateMeeting(meeting.id, (m) => ({
+                                  ...m,
+                                  autoAgenda: m.autoAgenda.filter((_, idx) => idx !== i),
+                                }))}
+                                className="p-0.5 text-text-muted/30 hover:text-rose-400 transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             </div>
                           ))}
                         </div>
+                        <button
+                          onClick={() => updateMeeting(meeting.id, (m) => ({
+                            ...m,
+                            autoAgenda: [...m.autoAgenda, { text: 'New agenda item', source: 'Manual' }],
+                          }))}
+                          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-teal-400 transition-colors mt-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add agenda item
+                        </button>
                       </div>
 
                       {/* Pre-reads */}
@@ -385,11 +501,51 @@ export function MeetingIntelView() {
                         <div className="space-y-2">
                           {meeting.preReads.map((pr, i) => (
                             <div key={i} className="p-2.5 rounded-lg bg-surface/50 border border-border/50">
-                              <p className="text-sm font-medium text-text-primary">{pr.title}</p>
-                              <p className="text-xs text-text-secondary mt-1 leading-relaxed">{pr.summary}</p>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <InlineText
+                                    value={pr.title}
+                                    onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                      const preReads = [...m.preReads];
+                                      preReads[i] = { ...preReads[i], title: v };
+                                      return { ...m, preReads };
+                                    })}
+                                    className="text-sm font-medium text-text-primary"
+                                  />
+                                  <InlineText
+                                    value={pr.summary}
+                                    onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                      const preReads = [...m.preReads];
+                                      preReads[i] = { ...preReads[i], summary: v };
+                                      return { ...m, preReads };
+                                    })}
+                                    className="text-xs text-text-secondary mt-1 leading-relaxed"
+                                    multiline
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => updateMeeting(meeting.id, (m) => ({
+                                    ...m,
+                                    preReads: m.preReads.filter((_, idx) => idx !== i),
+                                  }))}
+                                  className="p-0.5 text-text-muted/30 hover:text-rose-400 transition-colors flex-shrink-0"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
+                        <button
+                          onClick={() => updateMeeting(meeting.id, (m) => ({
+                            ...m,
+                            preReads: [...m.preReads, { title: 'New Pre-Read', summary: 'Summary...' }],
+                          }))}
+                          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-teal-400 transition-colors mt-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add pre-read
+                        </button>
                       </div>
 
                       {/* Suggested outcomes */}
@@ -402,10 +558,37 @@ export function MeetingIntelView() {
                           {meeting.suggestedOutcomes.map((outcome, i) => (
                             <div key={i} className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />
-                              <p className="text-sm text-text-secondary">{outcome.text}</p>
+                              <InlineText
+                                value={outcome.text}
+                                onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                  const outcomes = [...m.suggestedOutcomes];
+                                  outcomes[i] = { text: v };
+                                  return { ...m, suggestedOutcomes: outcomes };
+                                })}
+                                className="text-sm text-text-secondary"
+                              />
+                              <button
+                                onClick={() => updateMeeting(meeting.id, (m) => ({
+                                  ...m,
+                                  suggestedOutcomes: m.suggestedOutcomes.filter((_, idx) => idx !== i),
+                                }))}
+                                className="p-0.5 text-text-muted/30 hover:text-rose-400 transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             </div>
                           ))}
                         </div>
+                        <button
+                          onClick={() => updateMeeting(meeting.id, (m) => ({
+                            ...m,
+                            suggestedOutcomes: [...m.suggestedOutcomes, { text: 'New outcome' }],
+                          }))}
+                          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-teal-400 transition-colors mt-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add outcome
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -435,27 +618,39 @@ export function MeetingIntelView() {
                 style={{ animationDelay: `${300 + idx * 75}ms` }}
               >
                 {/* Meeting header */}
-                <button
-                  onClick={() => toggleExpand(meeting.id)}
-                  className="w-full flex items-center justify-between p-5 hover:bg-surface-2/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
+                <div className="w-full flex items-center justify-between p-5 hover:bg-surface-2/50 transition-colors">
+                  <button
+                    onClick={() => toggleExpand(meeting.id)}
+                    className="flex items-center gap-4 flex-1 text-left"
+                  >
                     <div className="flex flex-col items-center">
                       <span className="text-xs text-text-muted">{formatDisplayDate(meeting.date)}</span>
-                      <span className="text-sm font-bold text-text-secondary">{meeting.time}</span>
+                      <span className="text-sm font-bold text-text-secondary">
+                        <InlineText
+                          value={meeting.time}
+                          onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, time: v }))}
+                        />
+                      </span>
                     </div>
                     <div className="text-left">
-                      <h4 className="text-base font-semibold text-text-secondary">{meeting.title}</h4>
+                      <h4 className="text-base font-semibold text-text-secondary">
+                        <InlineText
+                          value={meeting.title}
+                          onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, title: v }))}
+                        />
+                      </h4>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${typeConf.color}`}>
-                          {typeConf.label}
-                        </span>
+                        <InlineSelect
+                          value={meeting.type}
+                          options={meetingTypeOptions}
+                          onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, type: v as Meeting['type'] }))}
+                        />
                         <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
                           Completed
                         </span>
                       </div>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-3">
                     <div className="hidden sm:flex items-center gap-2">
                       {meeting.decisions.length > 0 && (
@@ -465,9 +660,18 @@ export function MeetingIntelView() {
                         <span className="text-xs text-amber-400 font-medium">{meeting.actionItems.length} actions</span>
                       )}
                     </div>
-                    {isExpanded ? <ChevronUp className="w-5 h-5 text-text-muted" /> : <ChevronDown className="w-5 h-5 text-text-muted" />}
+                    <button
+                      onClick={() => deleteMeeting(meeting.id)}
+                      className="p-1 text-text-muted/30 hover:text-rose-400 transition-colors"
+                      title="Delete meeting"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => toggleExpand(meeting.id)}>
+                      {isExpanded ? <ChevronUp className="w-5 h-5 text-text-muted" /> : <ChevronDown className="w-5 h-5 text-text-muted" />}
+                    </button>
                   </div>
-                </button>
+                </div>
 
                 {/* Expanded content */}
                 {isExpanded && (
@@ -475,83 +679,153 @@ export function MeetingIntelView() {
                     {/* Post-meeting notes */}
                     <div className="p-5 bg-emerald-500/5">
                       {/* Decisions */}
-                      {meeting.decisions.length > 0 && (
-                        <div className="mb-5">
-                          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                            Decisions Captured
-                          </p>
-                          <div className="space-y-2">
-                            {meeting.decisions.map((dec, i) => (
-                              <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-surface/50 border border-emerald-500/20">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                  <p className="text-sm text-text-primary">{dec.text}</p>
-                                  <p className="text-[10px] text-text-muted mt-0.5">Decided by {dec.decidedBy}</p>
-                                </div>
+                      <div className="mb-5">
+                        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          Decisions Captured
+                        </p>
+                        <div className="space-y-2">
+                          {meeting.decisions.map((dec, i) => (
+                            <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-surface/50 border border-emerald-500/20">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <InlineText
+                                  value={dec.text}
+                                  onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                    const decisions = [...m.decisions];
+                                    decisions[i] = { ...decisions[i], text: v };
+                                    return { ...m, decisions };
+                                  })}
+                                  className="text-sm text-text-primary"
+                                />
+                                <p className="text-[10px] text-text-muted mt-0.5">
+                                  Decided by{' '}
+                                  <InlineText
+                                    value={dec.decidedBy}
+                                    onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                      const decisions = [...m.decisions];
+                                      decisions[i] = { ...decisions[i], decidedBy: v };
+                                      return { ...m, decisions };
+                                    })}
+                                  />
+                                </p>
                               </div>
-                            ))}
-                          </div>
+                              <button
+                                onClick={() => updateMeeting(meeting.id, (m) => ({
+                                  ...m,
+                                  decisions: m.decisions.filter((_, idx) => idx !== i),
+                                }))}
+                                className="p-0.5 text-text-muted/30 hover:text-rose-400 transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
                         </div>
-                      )}
+                        <button
+                          onClick={() => updateMeeting(meeting.id, (m) => ({
+                            ...m,
+                            decisions: [...m.decisions, { text: 'New decision', decidedBy: 'TBD' }],
+                          }))}
+                          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-teal-400 transition-colors mt-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add decision
+                        </button>
+                      </div>
 
                       {/* Action Items */}
-                      {meeting.actionItems.length > 0 && (
-                        <div className="mb-5">
-                          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-                            Action Items
-                          </p>
-                          <div className="space-y-2">
-                            {meeting.actionItems.map((action, i) => {
-                              const ownerMember = getMember(action.owner.toLowerCase());
-                              return (
-                                <div
-                                  key={i}
-                                  className={`flex items-start gap-3 p-2.5 rounded-lg border transition-all ${
-                                    action.done
-                                      ? 'bg-surface/30 border-border/50'
-                                      : 'bg-surface/50 border-amber-500/20'
-                                  }`}
+                      <div className="mb-5">
+                        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                          Action Items
+                        </p>
+                        <div className="space-y-2">
+                          {meeting.actionItems.map((action, i) => {
+                            const ownerMember = getMember(action.owner.toLowerCase());
+                            return (
+                              <div
+                                key={i}
+                                className={`flex items-start gap-3 p-2.5 rounded-lg border transition-all ${
+                                  action.done
+                                    ? 'bg-surface/30 border-border/50'
+                                    : 'bg-surface/50 border-amber-500/20'
+                                }`}
+                              >
+                                <button
+                                  onClick={() => toggleActionItem(meeting.id, i)}
+                                  className={`mt-0.5 flex-shrink-0 ${action.done ? 'text-emerald-400' : 'text-text-muted hover:text-amber-400'}`}
                                 >
-                                  <button
-                                    onClick={() => toggleActionItem(meeting.id, i)}
-                                    className={`mt-0.5 flex-shrink-0 ${action.done ? 'text-emerald-400' : 'text-text-muted hover:text-amber-400'}`}
-                                  >
-                                    <CheckCircle2 className={`w-4 h-4 ${action.done ? 'fill-emerald-400/20' : ''}`} />
-                                  </button>
-                                  <div className="flex-1">
-                                    <p className={`text-sm ${action.done ? 'text-text-muted line-through' : 'text-text-primary'}`}>
-                                      {action.text}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                                    {ownerMember && (
-                                      <div className={`w-5 h-5 rounded-md ${ownerMember.color} flex items-center justify-center text-white text-[8px] font-bold`}>
-                                        {ownerMember.avatar}
-                                      </div>
-                                    )}
-                                    <span className="text-xs text-text-muted">{action.owner}</span>
-                                  </div>
+                                  <CheckCircle2 className={`w-4 h-4 ${action.done ? 'fill-emerald-400/20' : ''}`} />
+                                </button>
+                                <div className="flex-1">
+                                  <InlineText
+                                    value={action.text}
+                                    onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                      const actionItems = [...m.actionItems];
+                                      actionItems[i] = { ...actionItems[i], text: v };
+                                      return { ...m, actionItems };
+                                    })}
+                                    className={`text-sm ${action.done ? 'text-text-muted line-through' : 'text-text-primary'}`}
+                                  />
                                 </div>
-                              );
-                            })}
-                          </div>
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  {ownerMember && (
+                                    <div className={`w-5 h-5 rounded-md ${ownerMember.color} flex items-center justify-center text-white text-[8px] font-bold`}>
+                                      {ownerMember.avatar}
+                                    </div>
+                                  )}
+                                  <InlineText
+                                    value={action.owner}
+                                    onSave={(v) => updateMeeting(meeting.id, (m) => {
+                                      const actionItems = [...m.actionItems];
+                                      actionItems[i] = { ...actionItems[i], owner: v };
+                                      return { ...m, actionItems };
+                                    })}
+                                    className="text-xs text-text-muted"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => updateMeeting(meeting.id, (m) => ({
+                                    ...m,
+                                    actionItems: m.actionItems.filter((_, idx) => idx !== i),
+                                  }))}
+                                  className="p-0.5 text-text-muted/30 hover:text-rose-400 transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
-                      )}
+                        <button
+                          onClick={() => updateMeeting(meeting.id, (m) => ({
+                            ...m,
+                            actionItems: [...m.actionItems, { text: 'New action item', owner: 'TBD', done: false }],
+                          }))}
+                          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-teal-400 transition-colors mt-2"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add action item
+                        </button>
+                      </div>
 
                       {/* Notes */}
-                      {meeting.notes && (
-                        <div>
-                          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <FileText className="w-3.5 h-3.5" />
-                            Meeting Notes
-                          </p>
-                          <div className="p-3 rounded-lg bg-surface/50 border border-border/50">
-                            <p className="text-sm text-text-secondary leading-relaxed">{meeting.notes}</p>
-                          </div>
+                      <div>
+                        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5" />
+                          Meeting Notes
+                        </p>
+                        <div className="p-3 rounded-lg bg-surface/50 border border-border/50">
+                          <InlineText
+                            value={meeting.notes}
+                            onSave={(v) => updateMeeting(meeting.id, (m) => ({ ...m, notes: v }))}
+                            className="text-sm text-text-secondary leading-relaxed"
+                            multiline
+                            placeholder="Click to add notes..."
+                          />
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )}

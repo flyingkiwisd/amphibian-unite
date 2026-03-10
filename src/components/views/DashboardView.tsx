@@ -63,8 +63,8 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   const displayKpis = kpis.slice(0, 4);
   const displayOkrs = okrs.slice(0, 3);
 
-  // Calculate progress from $100M to $1B (10% of the way)
-  const aumProgress = 10;
+  // Calculate progress from $80-100M to $1B (8-10% of the way)
+  const aumProgress = 9;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -111,7 +111,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <div className="flex flex-wrap gap-6 lg:gap-10">
               <div className="text-center">
                 <p className="text-xs text-text-muted uppercase tracking-wide mb-1">Current AUM</p>
-                <p className="text-2xl font-bold text-text-primary">$100M+</p>
+                <p className="text-2xl font-bold text-text-primary">$80-100M</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-text-muted uppercase tracking-wide mb-1">Edge Rating</p>
@@ -131,7 +131,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* Progress bar */}
           <div className="mt-6">
             <div className="flex items-center justify-between text-xs text-text-muted mb-2">
-              <span>$100M</span>
+              <span>$80M</span>
               <span className="text-accent font-medium">Journey to $1B+</span>
               <span>$1B</span>
             </div>

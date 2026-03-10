@@ -10,10 +10,13 @@ import {
   ChevronUp,
   User,
   Shield,
-  ArrowRight,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 import { getTeamMemberOS } from '@/lib/teamOS';
+import { useEditableStore } from '@/lib/useEditableStore';
+import { InlineText, InlineNumber, EditBanner } from '@/components/InlineEdit';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -34,7 +37,7 @@ interface MemberDrift {
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock Drift Data
 // ─────────────────────────────────────────────────────────────────────────────
-const driftData: MemberDrift[] = [
+const defaultDriftData: MemberDrift[] = [
   {
     memberId: 'james',
     driftScore: 20,
@@ -168,6 +171,11 @@ function getDriftBarColor(score: number): string {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 export function RoleDriftView() {
+  const { data: driftData, setData: setDriftData, hasEdits, resetAll } = useEditableStore<MemberDrift[]>(
+    'amphibian-unite-role-drift',
+    defaultDriftData
+  );
+
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
 
   // Sort by drift score descending
@@ -181,8 +189,38 @@ export function RoleDriftView() {
   const watchCount = driftData.filter((d) => d.driftScore >= 10 && d.driftScore <= 25).length;
   const alignedCount = driftData.filter((d) => d.driftScore < 10).length;
 
+  const updateMember = (memberId: string, updater: (m: MemberDrift) => MemberDrift) => {
+    setDriftData((prev) => prev.map((d) => (d.memberId === memberId ? updater(d) : d)));
+  };
+
+  const addActivity = (memberId: string, isInSeat: boolean) => {
+    updateMember(memberId, (m) => ({
+      ...m,
+      recentActivities: [
+        ...m.recentActivities,
+        { activity: 'New activity', isInSeat, category: 'Uncategorized' },
+      ],
+    }));
+  };
+
+  const deleteActivity = (memberId: string, actIdx: number) => {
+    updateMember(memberId, (m) => ({
+      ...m,
+      recentActivities: m.recentActivities.filter((_, i) => i !== actIdx),
+    }));
+  };
+
+  const updateActivity = (memberId: string, actIdx: number, updater: (a: DriftItem) => DriftItem) => {
+    updateMember(memberId, (m) => ({
+      ...m,
+      recentActivities: m.recentActivities.map((a, i) => (i === actIdx ? updater(a) : a)),
+    }));
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
+      <EditBanner hasEdits={hasEdits} onReset={resetAll} />
+
       {/* ── Header ── */}
       <div className="animate-fade-in" style={{ animationDelay: '0ms', opacity: 0 }}>
         <div className="flex items-center gap-3 mb-2">
@@ -312,6 +350,14 @@ export function RoleDriftView() {
           const driftItems = d.recentActivities.filter((a) => !a.isInSeat);
           const inSeatItems = d.recentActivities.filter((a) => a.isInSeat);
 
+          // Find the global indices for drift/in-seat items in recentActivities
+          const driftIndices = d.recentActivities
+            .map((a, i) => (!a.isInSeat ? i : -1))
+            .filter((i) => i !== -1);
+          const inSeatIndices = d.recentActivities
+            .map((a, i) => (a.isInSeat ? i : -1))
+            .filter((i) => i !== -1);
+
           return (
             <button
               key={d.memberId}
@@ -344,7 +390,13 @@ export function RoleDriftView() {
                       />
                     </div>
                     <span className={`text-sm font-bold w-10 text-right ${status.color}`}>
-                      {d.driftScore}%
+                      <InlineNumber
+                        value={d.driftScore}
+                        onSave={(v) => updateMember(d.memberId, (m) => ({ ...m, driftScore: v }))}
+                        suffix="%"
+                        min={0}
+                        max={100}
+                      />
                     </span>
                   </div>
                 </div>
@@ -391,7 +443,12 @@ export function RoleDriftView() {
                       <AlertTriangle className={`w-3 h-3 ${status.color}`} />
                       <span className={`text-xs font-semibold ${status.color}`}>Drift Pattern</span>
                     </div>
-                    <p className="text-xs text-text-secondary">{d.driftReason}</p>
+                    <InlineText
+                      value={d.driftReason}
+                      onSave={(v) => updateMember(d.memberId, (m) => ({ ...m, driftReason: v }))}
+                      className="text-xs text-text-secondary"
+                      multiline
+                    />
                   </div>
 
                   {/* Activity Lists */}
@@ -403,21 +460,45 @@ export function RoleDriftView() {
                         Outside Seat ({driftItems.length})
                       </h4>
                       <div className="space-y-1.5">
-                        {driftItems.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/20 rounded-lg p-2"
-                          >
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 shrink-0 mt-0.5">
-                              Not in seat
-                            </span>
-                            <div>
-                              <p className="text-xs text-text-secondary">{item.activity}</p>
-                              <p className="text-xs text-text-muted mt-0.5">{item.category}</p>
+                        {driftItems.map((item, localIdx) => {
+                          const globalIdx = driftIndices[localIdx];
+                          return (
+                            <div
+                              key={localIdx}
+                              className="flex items-start gap-2 bg-rose-500/5 border border-rose-500/20 rounded-lg p-2"
+                            >
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 shrink-0 mt-0.5">
+                                Not in seat
+                              </span>
+                              <div className="flex-1">
+                                <InlineText
+                                  value={item.activity}
+                                  onSave={(v) => updateActivity(d.memberId, globalIdx, (a) => ({ ...a, activity: v }))}
+                                  className="text-xs text-text-secondary"
+                                />
+                                <InlineText
+                                  value={item.category}
+                                  onSave={(v) => updateActivity(d.memberId, globalIdx, (a) => ({ ...a, category: v }))}
+                                  className="text-xs text-text-muted mt-0.5"
+                                />
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteActivity(d.memberId, globalIdx); }}
+                                className="p-0.5 text-text-muted/30 hover:text-rose-400 transition-colors flex-shrink-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addActivity(d.memberId, false); }}
+                        className="flex items-center gap-1.5 text-xs text-text-muted hover:text-teal-400 transition-colors mt-2"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add out-of-seat activity
+                      </button>
                     </div>
 
                     {/* In-Seat Items */}
@@ -427,19 +508,43 @@ export function RoleDriftView() {
                         In Seat ({inSeatItems.length})
                       </h4>
                       <div className="space-y-1.5">
-                        {inSeatItems.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-start gap-2 bg-surface-2 rounded-lg p-2"
-                          >
-                            <CheckCircle className="w-3 h-3 text-success shrink-0 mt-1" />
-                            <div>
-                              <p className="text-xs text-text-secondary">{item.activity}</p>
-                              <p className="text-xs text-text-muted mt-0.5">{item.category}</p>
+                        {inSeatItems.map((item, localIdx) => {
+                          const globalIdx = inSeatIndices[localIdx];
+                          return (
+                            <div
+                              key={localIdx}
+                              className="flex items-start gap-2 bg-surface-2 rounded-lg p-2"
+                            >
+                              <CheckCircle className="w-3 h-3 text-success shrink-0 mt-1" />
+                              <div className="flex-1">
+                                <InlineText
+                                  value={item.activity}
+                                  onSave={(v) => updateActivity(d.memberId, globalIdx, (a) => ({ ...a, activity: v }))}
+                                  className="text-xs text-text-secondary"
+                                />
+                                <InlineText
+                                  value={item.category}
+                                  onSave={(v) => updateActivity(d.memberId, globalIdx, (a) => ({ ...a, category: v }))}
+                                  className="text-xs text-text-muted mt-0.5"
+                                />
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteActivity(d.memberId, globalIdx); }}
+                                className="p-0.5 text-text-muted/30 hover:text-rose-400 transition-colors flex-shrink-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addActivity(d.memberId, true); }}
+                        className="flex items-center gap-1.5 text-xs text-text-muted hover:text-teal-400 transition-colors mt-2"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add in-seat activity
+                      </button>
                     </div>
                   </div>
                 </div>

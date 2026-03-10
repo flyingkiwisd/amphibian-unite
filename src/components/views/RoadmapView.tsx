@@ -10,12 +10,16 @@ import {
   Calendar,
   Download,
   Milestone,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { roadmapPhases } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
+import { useEditableStore } from '@/lib/useEditableStore';
+import { InlineText, InlineSelect, EditBanner } from '@/components/InlineEdit';
 
 const aumMilestones = [
-  { label: '$100M', revenue: '$1.6-2M', position: 0, isCurrent: true },
+  { label: '$80-100M', revenue: '$1.6-2M', position: 0, isCurrent: true },
   { label: '$200M', revenue: '$3-4M', position: 25, isCurrent: false },
   { label: '$400M', revenue: '$5-8M', position: 50, isCurrent: false },
   { label: '$750M', revenue: '$10-15M', position: 75, isCurrent: false },
@@ -85,9 +89,46 @@ const ninetyDayGate = [
   'Strategy performance database operational',
 ];
 
+const statusOptions = [
+  { label: 'Active', value: 'active', color: 'bg-accent/15 text-accent border border-accent/30' },
+  { label: 'Upcoming', value: 'upcoming', color: 'bg-blue-500/15 text-blue-400 border border-blue-500/30' },
+  { label: 'Future', value: 'future', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
+];
+
 export function RoadmapView() {
+  const { data: phases, setData: setPhases, hasEdits, resetAll } = useEditableStore(
+    'amphibian-unite-roadmap',
+    roadmapPhases
+  );
+
+  const updatePhase = (index: number, field: string, value: string) => {
+    setPhases((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
+    );
+  };
+
+  const addPhase = () => {
+    setPhases((prev) => [
+      ...prev,
+      {
+        phase: 'NEW PHASE',
+        when: 'TBD',
+        edge: '0.0',
+        description: 'Click to edit description...',
+        status: 'upcoming' as const,
+      },
+    ]);
+  };
+
+  const deletePhase = (index: number) => {
+    setPhases((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div id="roadmap-view-content" className="space-y-8 animate-fade-in">
+      {/* ── Edit Banner ── */}
+      <EditBanner hasEdits={hasEdits} onReset={resetAll} />
+
       {/* ── Header ── */}
       <div className="mb-2">
         <div className="flex items-center gap-3 mb-2">
@@ -191,11 +232,20 @@ export function RoadmapView() {
 
       {/* ── Phase Timeline (Vertical) ── */}
       <div className="animate-fade-in" style={{ animationDelay: '150ms' }}>
-        <div className="flex items-center gap-2 mb-5">
-          <Milestone className="w-5 h-5 text-accent" />
-          <h2 className="text-lg font-semibold text-text-primary">
-            Execution Phases
-          </h2>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Milestone className="w-5 h-5 text-accent" />
+            <h2 className="text-lg font-semibold text-text-primary">
+              Execution Phases
+            </h2>
+          </div>
+          <button
+            onClick={addPhase}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-400 bg-teal-500/10 border border-teal-500/20 rounded-lg hover:bg-teal-500/20 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Phase
+          </button>
         </div>
 
         <div className="relative">
@@ -203,7 +253,7 @@ export function RoadmapView() {
           <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-border-2" />
 
           <div className="space-y-5">
-            {roadmapPhases.map((phase, index) => {
+            {phases.map((phase, index) => {
               const isActive = phase.status === 'active';
 
               return (
@@ -242,31 +292,50 @@ export function RoadmapView() {
                             isActive ? 'text-accent' : 'text-text-secondary'
                           }`}
                         >
-                          {phase.phase}
+                          <InlineText
+                            value={phase.phase}
+                            onSave={(v) => updatePhase(index, 'phase', v)}
+                          />
                         </h3>
-                        {isActive && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
-                            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                            Active
-                          </span>
-                        )}
+                        <InlineSelect
+                          value={phase.status}
+                          options={statusOptions}
+                          onSave={(v) => updatePhase(index, 'status', v)}
+                        />
                       </div>
 
                       <div className="flex items-center gap-3">
                         <span className="inline-flex items-center gap-1.5 text-xs text-text-muted font-mono">
                           <Calendar size={12} />
-                          {phase.when}
+                          <InlineText
+                            value={phase.when}
+                            onSave={(v) => updatePhase(index, 'when', v)}
+                          />
                         </span>
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-3 px-2.5 py-1 text-[11px] font-mono text-text-secondary">
                           <Star size={11} className="text-accent-amber" />
-                          Edge: {phase.edge}
+                          Edge: <InlineText
+                            value={phase.edge}
+                            onSave={(v) => updatePhase(index, 'edge', v)}
+                          />
                         </span>
+                        <button
+                          onClick={() => deletePhase(index)}
+                          className="p-1 rounded hover:bg-rose-500/20 text-text-muted/40 hover:text-rose-400 transition-all"
+                          title="Delete phase"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 
                     {/* Description */}
                     <p className="text-sm text-text-secondary leading-relaxed mb-1">
-                      {phase.description}
+                      <InlineText
+                        value={phase.description}
+                        onSave={(v) => updatePhase(index, 'description', v)}
+                        multiline
+                      />
                     </p>
 
                     {/* Active phase: expanded breakdown */}

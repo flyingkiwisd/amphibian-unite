@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { agents } from '@/lib/data';
+import { agents as defaultAgents } from '@/lib/data';
 import type { Agent } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
+import { useEditableStore } from '@/lib/useEditableStore';
+import { InlineText, InlineSelect, InlineList, EditBanner } from '@/components/InlineEdit';
 import {
   Compass,
   Users,
@@ -23,6 +25,8 @@ import {
   Check,
   Database,
   Download,
+  Plus,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -86,19 +90,72 @@ function getGradientBorder(color: string): string {
   return colorMap[colorName] || 'from-teal-400 via-teal-500 to-teal-600';
 }
 
-export function AgentsView() {
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+const statusOptions = [
+  { label: 'Active', value: 'active', color: 'bg-green-500/15 text-green-400 border border-green-500/30' },
+  { label: 'Building', value: 'building', color: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
+  { label: 'Planned', value: 'planned', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
+];
 
-  const activeCount = agents.filter((a) => a.status === 'active').length;
-  const buildingCount = agents.filter((a) => a.status === 'building').length;
-  const plannedCount = agents.filter((a) => a.status === 'planned').length;
+const priorityOptions = [
+  { label: 'Critical', value: 'critical', color: 'bg-red-500/15 text-red-400 border border-red-500/30' },
+  { label: 'High', value: 'high', color: 'bg-orange-500/15 text-orange-400 border border-orange-500/30' },
+  { label: 'Medium', value: 'medium', color: 'bg-blue-500/15 text-blue-400 border border-blue-500/30' },
+  { label: 'Low', value: 'low', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
+];
+
+export function AgentsView() {
+  const { data: agentsData, setData: setAgents, hasEdits, resetAll } = useEditableStore(
+    'amphibian-unite-agents',
+    defaultAgents
+  );
+
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const selectedAgent = selectedAgentId ? agentsData.find((a) => a.id === selectedAgentId) || null : null;
+
+  const activeCount = agentsData.filter((a) => a.status === 'active').length;
+  const buildingCount = agentsData.filter((a) => a.status === 'building').length;
+  const plannedCount = agentsData.filter((a) => a.status === 'planned').length;
 
   const handleDownloadPDF = (agent: Agent) => {
     exportToPdf('agent-detail-panel', `amphibian-unite-agent-${agent.id}`);
   };
 
+  const updateAgent = (id: string, field: string, value: string | string[]) => {
+    setAgents((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, [field]: value } : a))
+    );
+  };
+
+  const addAgent = () => {
+    const newId = `agent-${Date.now()}`;
+    setAgents((prev) => [
+      ...prev,
+      {
+        id: newId,
+        name: 'New Agent',
+        shortName: 'New',
+        icon: 'Compass',
+        color: 'text-teal-400',
+        gradient: 'from-teal-500/20 to-teal-500/5',
+        description: 'Click to edit description...',
+        capabilities: ['Click to add capabilities'],
+        dataSourcesConnected: [],
+        status: 'planned' as const,
+        priority: 'medium' as const,
+      },
+    ]);
+  };
+
+  const deleteAgent = (id: string) => {
+    if (selectedAgentId === id) setSelectedAgentId(null);
+    setAgents((prev) => prev.filter((a) => a.id !== id));
+  };
+
   return (
     <div className="space-y-8">
+      {/* Edit Banner */}
+      <EditBanner hasEdits={hasEdits} onReset={resetAll} />
+
       {/* Header */}
       <div className="animate-fade-in">
         <h1 className="text-3xl font-bold text-text-primary">
@@ -115,7 +172,7 @@ export function AgentsView() {
         style={{ animationDelay: '100ms' }}
       >
         {[
-          { label: 'Total Agents', value: agents.length, color: 'text-text-primary' },
+          { label: 'Total Agents', value: agentsData.length, color: 'text-text-primary' },
           { label: 'Active', value: activeCount, color: 'text-green-400' },
           { label: 'Building', value: buildingCount, color: 'text-amber-400' },
           { label: 'Planned', value: plannedCount, color: 'text-gray-400' },
@@ -130,66 +187,91 @@ export function AgentsView() {
         ))}
       </div>
 
-      {/* Agent Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {agents.map((agent, index) => {
-          const IconComponent = iconMap[agent.icon] || Compass;
-          return (
-            <div
-              key={agent.id}
-              className="glow-card group bg-surface rounded-xl border border-border cursor-pointer transition-all duration-300 hover:border-border-2 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 animate-fade-in"
-              style={{ animationDelay: `${(index + 2) * 75}ms`, opacity: 0 }}
-              onClick={() => setSelectedAgent(agent)}
-            >
-              {/* Gradient Top Border */}
+      {/* Add Agent Button + Agent Grid */}
+      <div>
+        <div className="flex items-center justify-end mb-4">
+          <button
+            onClick={addAgent}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-400 bg-teal-500/10 border border-teal-500/20 rounded-lg hover:bg-teal-500/20 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Agent
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {agentsData.map((agent, index) => {
+            const IconComponent = iconMap[agent.icon] || Compass;
+            return (
               <div
-                className={`h-1 rounded-t-xl bg-gradient-to-r ${getGradientBorder(agent.color)}`}
-              />
+                key={agent.id}
+                className="glow-card group bg-surface rounded-xl border border-border cursor-pointer transition-all duration-300 hover:border-border-2 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 animate-fade-in"
+                style={{ animationDelay: `${(index + 2) * 75}ms`, opacity: 0 }}
+                onClick={() => setSelectedAgentId(agent.id)}
+              >
+                {/* Gradient Top Border */}
+                <div
+                  className={`h-1 rounded-t-xl bg-gradient-to-r ${getGradientBorder(agent.color)}`}
+                />
 
-              <div className="p-5">
-                {/* Icon + Name Row */}
-                <div className="flex items-start gap-3 mb-3">
-                  <div
-                    className={`p-2.5 rounded-lg bg-gradient-to-br ${agent.gradient} flex-shrink-0`}
-                  >
-                    <IconComponent className={`w-5 h-5 ${agent.color}`} />
+                <div className="p-5">
+                  {/* Icon + Name Row */}
+                  <div className="flex items-start gap-3 mb-3">
+                    <div
+                      className={`p-2.5 rounded-lg bg-gradient-to-br ${agent.gradient} flex-shrink-0`}
+                    >
+                      <IconComponent className={`w-5 h-5 ${agent.color}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-text-primary leading-tight">
+                        <InlineText
+                          value={agent.name}
+                          onSave={(v) => updateAgent(agent.id, 'name', v)}
+                        />
+                      </h3>
+                      <p className="text-xs text-text-muted mt-1 line-clamp-2 leading-relaxed">
+                        <InlineText
+                          value={agent.description}
+                          onSave={(v) => updateAgent(agent.id, 'description', v)}
+                          multiline
+                        />
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold text-text-primary leading-tight">
-                      {agent.name}
-                    </h3>
-                    <p className="text-xs text-text-muted mt-1 line-clamp-2 leading-relaxed">
-                      {agent.description}
-                    </p>
+
+                  {/* Status + Priority Badges */}
+                  <div className="flex items-center gap-2 mb-3" onClick={(e) => e.stopPropagation()}>
+                    <InlineSelect
+                      value={agent.status}
+                      options={statusOptions}
+                      onSave={(v) => updateAgent(agent.id, 'status', v)}
+                    />
+                    <InlineSelect
+                      value={agent.priority}
+                      options={priorityOptions}
+                      onSave={(v) => updateAgent(agent.id, 'priority', v)}
+                    />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteAgent(agent.id); }}
+                      className="ml-auto p-1 rounded hover:bg-rose-500/20 text-text-muted/30 hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100"
+                      title="Delete agent"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                </div>
 
-                {/* Status + Priority Badges */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span
-                    className={`text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full ${getStatusStyle(agent.status)}`}
-                  >
-                    {agent.status}
-                  </span>
-                  <span
-                    className={`text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full ${getPriorityStyle(agent.priority)}`}
-                  >
-                    {agent.priority}
-                  </span>
-                </div>
-
-                {/* Connected Data Sources */}
-                <div className="flex items-center gap-1.5 text-text-muted">
-                  <Database className="w-3.5 h-3.5" />
-                  <span className="text-xs">
-                    {agent.dataSourcesConnected.length} connected source
-                    {agent.dataSourcesConnected.length !== 1 ? 's' : ''}
-                  </span>
+                  {/* Connected Data Sources */}
+                  <div className="flex items-center gap-1.5 text-text-muted">
+                    <Database className="w-3.5 h-3.5" />
+                    <span className="text-xs">
+                      {agent.dataSourcesConnected.length} connected source
+                      {agent.dataSourcesConnected.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Detail Panel Overlay */}
@@ -198,7 +280,7 @@ export function AgentsView() {
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300"
-            onClick={() => setSelectedAgent(null)}
+            onClick={() => setSelectedAgentId(null)}
           />
 
           {/* Slide-in Panel */}
@@ -217,13 +299,16 @@ export function AgentsView() {
                       </div>
                       <div>
                         <h2 className="text-xl font-bold text-text-primary">
-                          {selectedAgent.name}
+                          <InlineText
+                            value={selectedAgent.name}
+                            onSave={(v) => updateAgent(selectedAgent.id, 'name', v)}
+                          />
                         </h2>
                         <p className="text-sm text-text-muted">{selectedAgent.shortName}</p>
                       </div>
                     </div>
                     <button
-                      onClick={() => setSelectedAgent(null)}
+                      onClick={() => setSelectedAgentId(null)}
                       className="p-2 rounded-lg hover:bg-surface-2 transition-colors text-text-muted hover:text-text-primary"
                     >
                       <X className="w-5 h-5" />
@@ -232,16 +317,16 @@ export function AgentsView() {
 
                   {/* Status + Priority */}
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`text-xs uppercase font-semibold tracking-wider px-3 py-1 rounded-full ${getStatusStyle(selectedAgent.status)}`}
-                    >
-                      {selectedAgent.status}
-                    </span>
-                    <span
-                      className={`text-xs uppercase font-semibold tracking-wider px-3 py-1 rounded-full ${getPriorityStyle(selectedAgent.priority)}`}
-                    >
-                      {selectedAgent.priority} priority
-                    </span>
+                    <InlineSelect
+                      value={selectedAgent.status}
+                      options={statusOptions}
+                      onSave={(v) => updateAgent(selectedAgent.id, 'status', v)}
+                    />
+                    <InlineSelect
+                      value={selectedAgent.priority}
+                      options={priorityOptions}
+                      onSave={(v) => updateAgent(selectedAgent.id, 'priority', v)}
+                    />
                   </div>
 
                   {/* Full Description */}
@@ -250,7 +335,11 @@ export function AgentsView() {
                       Description
                     </h3>
                     <p className="text-text-primary leading-relaxed text-sm">
-                      {selectedAgent.description}
+                      <InlineText
+                        value={selectedAgent.description}
+                        onSave={(v) => updateAgent(selectedAgent.id, 'description', v)}
+                        multiline
+                      />
                     </p>
                   </div>
 
@@ -259,14 +348,12 @@ export function AgentsView() {
                     <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
                       Capabilities
                     </h3>
-                    <ul className="space-y-2">
-                      {selectedAgent.capabilities.map((capability, i) => (
-                        <li key={i} className="flex items-start gap-2.5">
-                          <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                          <span className="text-sm text-text-primary">{capability}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <InlineList
+                      items={selectedAgent.capabilities}
+                      onSave={(v) => updateAgent(selectedAgent.id, 'capabilities', v)}
+                      placeholder="Add capability..."
+                      icon={<Check className="w-4 h-4 text-green-400" />}
+                    />
                   </div>
 
                   {/* Data Sources Connected */}
@@ -274,17 +361,12 @@ export function AgentsView() {
                     <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
                       Data Sources Connected
                     </h3>
-                    <div className="space-y-2">
-                      {selectedAgent.dataSourcesConnected.map((source, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-surface-2 border border-border"
-                        >
-                          <Database className="w-4 h-4 text-text-muted flex-shrink-0" />
-                          <span className="text-sm text-text-primary">{source}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <InlineList
+                      items={selectedAgent.dataSourcesConnected}
+                      onSave={(v) => updateAgent(selectedAgent.id, 'dataSourcesConnected', v)}
+                      placeholder="Add data source..."
+                      icon={<Database className="w-4 h-4 text-text-muted" />}
+                    />
                   </div>
 
                   {/* Download PDF Button */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { aiLayers, edgeAssessment, productTargets, strategicPaths2030, yieldEnvironment } from '@/lib/data';
+import { aiLayers as defaultAiLayers, edgeAssessment, productTargets, strategicPaths2030, yieldEnvironment } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
 import {
   Cpu,
@@ -18,8 +18,11 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  Plus,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useEditableStore } from '@/lib/useEditableStore';
+import { InlineText, InlineNumber, InlineSelect, EditBanner } from '@/components/InlineEdit';
 
 const layerIcons = [Cpu, Zap, Brain, Shield, TrendingUp, Activity];
 
@@ -52,6 +55,13 @@ const progressBarColor = (index: number) => {
   return colors[index] || colors[0];
 };
 
+const statusOptions = [
+  { label: 'HIGH', value: 'HIGH', color: 'bg-teal-500/15 text-teal-400 border border-teal-500/30' },
+  { label: 'MEDIUM', value: 'MEDIUM', color: 'bg-blue-500/15 text-blue-400 border border-blue-500/30' },
+  { label: 'ONGOING', value: 'ONGOING', color: 'bg-purple-500/15 text-purple-400 border border-purple-500/30' },
+  { label: 'LOW', value: 'LOW', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
+];
+
 export function AIEdgeView() {
   const currentRating = edgeAssessment.bridgeV3Rating;
   const andrewRating = edgeAssessment.andrewConsensusRating;
@@ -60,8 +70,36 @@ export function AIEdgeView() {
   const andrewProgressPercent = (andrewRating / targetRating) * 100;
   const [expandedPath, setExpandedPath] = useState<number | null>(null);
 
+  const { data: layers, setData: setLayers, hasEdits, resetAll } = useEditableStore(
+    'amphibian-unite-ai-edge',
+    defaultAiLayers
+  );
+
+  const updateLayer = (index: number, field: string, value: string | number) => {
+    setLayers((prev) =>
+      prev.map((l, i) => (i === index ? { ...l, [field]: value } : l))
+    );
+  };
+
+  const addCapability = () => {
+    setLayers((prev) => [
+      ...prev,
+      {
+        layer: prev.length + 1,
+        name: 'New Layer',
+        edge: '+0 bps',
+        priority: 'MEDIUM',
+        description: 'Click to edit description...',
+        status: 0,
+      },
+    ]);
+  };
+
   return (
     <div id="aiedge-view-content" className="space-y-8 animate-fade-in">
+      {/* ── Edit Banner ── */}
+      <EditBanner hasEdits={hasEdits} onReset={resetAll} />
+
       {/* ── Header ── */}
       <div className="animate-fade-in" style={{ animationDelay: '0ms', opacity: 0 }}>
         <div className="flex items-center gap-3 mb-2">
@@ -254,23 +292,32 @@ export function AIEdgeView() {
 
       {/* ── 6-Layer AI Stack ── */}
       <div>
-        <div className="flex items-center gap-2 mb-5 animate-fade-in" style={{ animationDelay: '450ms', opacity: 0 }}>
-          <Cpu className="w-5 h-5 text-teal-400" />
-          <h2 className="text-xl font-semibold text-text-primary">6-Layer AI Stack</h2>
+        <div className="flex items-center justify-between mb-5 animate-fade-in" style={{ animationDelay: '450ms', opacity: 0 }}>
+          <div className="flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-teal-400" />
+            <h2 className="text-xl font-semibold text-text-primary">6-Layer AI Stack</h2>
+          </div>
+          <button
+            onClick={addCapability}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-400 bg-teal-500/10 border border-teal-500/20 rounded-lg hover:bg-teal-500/20 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Layer
+          </button>
         </div>
         <div className="relative">
-          {aiLayers.map((layer, index) => {
+          {layers.map((layer, index) => {
             const Icon = layerIcons[index] || Cpu;
             return (
-              <div key={layer.layer} className="relative">
-                {index < aiLayers.length - 1 && (
+              <div key={index} className="relative">
+                {index < layers.length - 1 && (
                   <div className="absolute left-8 top-full z-10 flex flex-col items-center h-6">
                     <div className="w-0.5 h-4 bg-gradient-to-b from-teal-500/40 to-purple-500/40" />
                     <ArrowDown className="w-3.5 h-3.5 text-teal-400/60 -mt-0.5" />
                   </div>
                 )}
                 <div
-                  className={`glow-card bg-gradient-to-r ${layerGradient(index)} bg-surface rounded-xl border ${layerBorderColor(index)} p-5 transition-all duration-300 animate-fade-in ${index < aiLayers.length - 1 ? 'mb-6' : ''}`}
+                  className={`glow-card bg-gradient-to-r ${layerGradient(index)} bg-surface rounded-xl border ${layerBorderColor(index)} p-5 transition-all duration-300 animate-fade-in ${index < layers.length - 1 ? 'mb-6' : ''}`}
                   style={{ animationDelay: `${500 + index * 80}ms`, opacity: 0 }}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -281,17 +328,45 @@ export function AIEdgeView() {
                       <div className="flex flex-wrap items-center gap-3 mb-1">
                         <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4 text-text-secondary" />
-                          <h3 className="text-lg font-semibold text-text-primary">{layer.name}</h3>
+                          <h3 className="text-lg font-semibold text-text-primary">
+                            <InlineText
+                              value={layer.name}
+                              onSave={(v) => updateLayer(index, 'name', v)}
+                            />
+                          </h3>
                         </div>
-                        <span className="text-green-400 font-mono text-sm font-medium bg-green-500/10 px-2 py-0.5 rounded">{layer.edge}</span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${priorityStyle(layer.priority)}`}>{layer.priority}</span>
+                        <span className="text-green-400 font-mono text-sm font-medium bg-green-500/10 px-2 py-0.5 rounded">
+                          <InlineText
+                            value={layer.edge}
+                            onSave={(v) => updateLayer(index, 'edge', v)}
+                          />
+                        </span>
+                        <InlineSelect
+                          value={layer.priority}
+                          options={statusOptions}
+                          onSave={(v) => updateLayer(index, 'priority', v)}
+                        />
                       </div>
-                      <p className="text-text-secondary text-sm mb-3">{layer.description}</p>
+                      <p className="text-text-secondary text-sm mb-3">
+                        <InlineText
+                          value={layer.description}
+                          onSave={(v) => updateLayer(index, 'description', v)}
+                          multiline
+                        />
+                      </p>
                       <div className="flex items-center gap-3">
                         <div className="flex-1 h-2 bg-surface-2 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full ${progressBarColor(index)} transition-all duration-1000 ease-out`} style={{ width: `${layer.status}%` }} />
                         </div>
-                        <span className="text-xs font-mono text-text-muted w-8 text-right">{layer.status}%</span>
+                        <span className="text-xs font-mono text-text-muted w-12 text-right">
+                          <InlineNumber
+                            value={layer.status}
+                            onSave={(v) => updateLayer(index, 'status', v)}
+                            suffix="%"
+                            min={0}
+                            max={100}
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>

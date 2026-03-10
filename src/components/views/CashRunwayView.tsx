@@ -12,67 +12,105 @@ import {
   ArrowDownRight,
   BarChart3,
 } from 'lucide-react';
+import { useEditableStore } from '@/lib/useEditableStore';
+import { InlineNumber, InlineText, EditBanner } from '@/components/InlineEdit';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock Data
+// Data shape
 // ─────────────────────────────────────────────────────────────────────────────
-const kpiData = {
-  aum: { value: 48, trend: 'up' as const, delta: '+$3M', sparkline: [42, 43, 44, 45, 46, 48] },
-  burn: { value: 85, trend: 'flat' as const, delta: '-$2K', sparkline: [90, 88, 87, 86, 85, 85] },
-  revenue: { value: 40, trend: 'up' as const, delta: '+$5K', sparkline: [30, 32, 34, 36, 38, 40] },
-  runway: { value: 18, trend: 'up' as const, delta: '+2 mo', sparkline: [14, 15, 15, 16, 17, 18] },
+interface CashRunwayData {
+  kpi: {
+    aum: { value: number; delta: string; sparkline: number[] };
+    burn: { value: number; delta: string; sparkline: number[] };
+    revenue: { value: number; delta: string; sparkline: number[] };
+    runway: { value: number; delta: string; sparkline: number[] };
+  };
+  breakEvenAUM: number;
+  revenueVsPlan: { month: string; actual: number; plan: number }[];
+  scenarios: {
+    name: string;
+    label: string;
+    color: string;
+    borderColor: string;
+    bgColor: string;
+    badgeColor: string;
+    projectedAUM: string;
+    projectedRevenue: string;
+    projectedRunway: string;
+    aumGrowth: string;
+    description: string;
+  }[];
+  assumptions: {
+    title: string;
+    value: string;
+    detail: string;
+  }[];
+}
+
+const defaultData: CashRunwayData = {
+  kpi: {
+    aum: { value: 48, delta: '+$3M', sparkline: [42, 43, 44, 45, 46, 48] },
+    burn: { value: 85, delta: '-$2K', sparkline: [90, 88, 87, 86, 85, 85] },
+    revenue: { value: 40, delta: '+$5K', sparkline: [30, 32, 34, 36, 38, 40] },
+    runway: { value: 18, delta: '+2 mo', sparkline: [14, 15, 15, 16, 17, 18] },
+  },
+  breakEvenAUM: 65,
+  revenueVsPlan: [
+    { month: 'Oct', actual: 28, plan: 30 },
+    { month: 'Nov', actual: 30, plan: 32 },
+    { month: 'Dec', actual: 33, plan: 34 },
+    { month: 'Jan', actual: 35, plan: 36 },
+    { month: 'Feb', actual: 38, plan: 38 },
+    { month: 'Mar', actual: 40, plan: 40 },
+  ],
+  scenarios: [
+    {
+      name: 'Base Case',
+      label: 'Most Likely',
+      color: 'text-teal-400',
+      borderColor: 'border-teal-500/30',
+      bgColor: 'bg-teal-500/10',
+      badgeColor: 'bg-teal-500/20 text-teal-400',
+      projectedAUM: '$65M',
+      projectedRevenue: '$54K/mo',
+      projectedRunway: '24+ months',
+      aumGrowth: '+$2.8M/mo',
+      description: 'Steady LP inflows, current burn maintained. Breaks even at $65M AUM by Q4 2026.',
+    },
+    {
+      name: 'Upside',
+      label: 'Best Case',
+      color: 'text-emerald-400',
+      borderColor: 'border-emerald-500/30',
+      bgColor: 'bg-emerald-500/10',
+      badgeColor: 'bg-emerald-500/20 text-emerald-400',
+      projectedAUM: '$95M',
+      projectedRevenue: '$79K/mo',
+      projectedRunway: '36+ months',
+      aumGrowth: '+$5M/mo',
+      description: 'Strong LP conversions, Dynamic Alpha launch accelerates growth. Profitable by Q3 2026.',
+    },
+    {
+      name: 'Downside',
+      label: 'Stress Test',
+      color: 'text-rose-400',
+      borderColor: 'border-rose-500/30',
+      bgColor: 'bg-rose-500/10',
+      badgeColor: 'bg-rose-500/20 text-rose-400',
+      projectedAUM: '$40M',
+      projectedRevenue: '$33K/mo',
+      projectedRunway: '10 months',
+      aumGrowth: '-$1.3M/mo',
+      description: 'LP redemptions in a bear market, no new inflows. Requires cost restructuring by Q3.',
+    },
+  ],
+  assumptions: [
+    { title: 'Management Fee', value: '1% of AUM annually', detail: '~$40K/mo at $48M AUM' },
+    { title: 'Performance Fee', value: '20% over hurdle', detail: 'Not included in base projections' },
+    { title: 'Burn Composition', value: '$85K/month', detail: 'Team: $60K | Infra: $15K | Other: $10K' },
+    { title: 'Break-Even', value: '$65M AUM', detail: 'Revenue covers burn at this level' },
+  ],
 };
-
-const revenueVsPlan = [
-  { month: 'Oct', actual: 28, plan: 30 },
-  { month: 'Nov', actual: 30, plan: 32 },
-  { month: 'Dec', actual: 33, plan: 34 },
-  { month: 'Jan', actual: 35, plan: 36 },
-  { month: 'Feb', actual: 38, plan: 38 },
-  { month: 'Mar', actual: 40, plan: 40 },
-];
-
-const scenarios = [
-  {
-    name: 'Base Case',
-    label: 'Most Likely',
-    color: 'text-teal-400',
-    borderColor: 'border-teal-500/30',
-    bgColor: 'bg-teal-500/10',
-    badgeColor: 'bg-teal-500/20 text-teal-400',
-    projectedAUM: '$65M',
-    projectedRevenue: '$54K/mo',
-    projectedRunway: '24+ months',
-    aumGrowth: '+$2.8M/mo',
-    description: 'Steady LP inflows, current burn maintained. Breaks even at $65M AUM by Q4 2026.',
-  },
-  {
-    name: 'Upside',
-    label: 'Best Case',
-    color: 'text-emerald-400',
-    borderColor: 'border-emerald-500/30',
-    bgColor: 'bg-emerald-500/10',
-    badgeColor: 'bg-emerald-500/20 text-emerald-400',
-    projectedAUM: '$95M',
-    projectedRevenue: '$79K/mo',
-    projectedRunway: '36+ months',
-    aumGrowth: '+$5M/mo',
-    description: 'Strong LP conversions, Dynamic Alpha launch accelerates growth. Profitable by Q3 2026.',
-  },
-  {
-    name: 'Downside',
-    label: 'Stress Test',
-    color: 'text-rose-400',
-    borderColor: 'border-rose-500/30',
-    bgColor: 'bg-rose-500/10',
-    badgeColor: 'bg-rose-500/20 text-rose-400',
-    projectedAUM: '$40M',
-    projectedRevenue: '$33K/mo',
-    projectedRunway: '10 months',
-    aumGrowth: '-$1.3M/mo',
-    description: 'LP redemptions in a bear market, no new inflows. Requires cost restructuring by Q3.',
-  },
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sparkline component
@@ -111,18 +149,63 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 export function CashRunwayView() {
+  const { data, setData, hasEdits, resetAll } = useEditableStore<CashRunwayData>(
+    'amphibian-unite-cash-runway',
+    defaultData
+  );
   const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
 
-  const breakEvenAUM = 65;
-  const currentAUM = kpiData.aum.value;
-  const breakEvenProgress = Math.min((currentAUM / breakEvenAUM) * 100, 100);
+  const currentAUM = data.kpi.aum.value;
+  const breakEvenProgress = Math.min((currentAUM / data.breakEvenAUM) * 100, 100);
 
   const maxBar = Math.max(
-    ...revenueVsPlan.map((r) => Math.max(r.actual, r.plan))
+    ...data.revenueVsPlan.map((r) => Math.max(r.actual, r.plan))
   );
+
+  // ── Helpers for nested updates ──
+  const updateKpi = (
+    key: 'aum' | 'burn' | 'revenue' | 'runway',
+    field: 'value',
+    val: number
+  ) => {
+    setData((prev) => ({
+      ...prev,
+      kpi: { ...prev.kpi, [key]: { ...prev.kpi[key], [field]: val } },
+    }));
+  };
+
+  const updateRevPlan = (idx: number, field: 'actual' | 'plan', val: number) => {
+    setData((prev) => ({
+      ...prev,
+      revenueVsPlan: prev.revenueVsPlan.map((r, i) =>
+        i === idx ? { ...r, [field]: val } : r
+      ),
+    }));
+  };
+
+  const updateScenario = (idx: number, field: string, val: string) => {
+    setData((prev) => ({
+      ...prev,
+      scenarios: prev.scenarios.map((s, i) =>
+        i === idx ? { ...s, [field]: val } : s
+      ),
+    }));
+  };
+
+  const updateAssumption = (idx: number, field: 'value' | 'detail', val: string) => {
+    setData((prev) => ({
+      ...prev,
+      assumptions: prev.assumptions.map((a, i) =>
+        i === idx ? { ...a, [field]: val } : a
+      ),
+    }));
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* ── Edit Banner ── */}
+      <EditBanner hasEdits={hasEdits} onReset={resetAll} />
+
       {/* ── Header ── */}
       <div className="animate-fade-in" style={{ animationDelay: '0ms', opacity: 0 }}>
         <div className="flex items-center gap-3 mb-2">
@@ -152,13 +235,20 @@ export function CashRunwayView() {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-2xl font-bold text-text-primary">${kpiData.aum.value}M</p>
+              <p className="text-2xl font-bold text-text-primary">
+                <InlineNumber
+                  value={data.kpi.aum.value}
+                  onSave={(v) => updateKpi('aum', 'value', v)}
+                  prefix="$"
+                  suffix="M"
+                />
+              </p>
               <p className="text-xs text-success mt-1 flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3" />
-                {kpiData.aum.delta} this quarter
+                {data.kpi.aum.delta} this quarter
               </p>
             </div>
-            <Sparkline data={kpiData.aum.sparkline} color="#22c55e" />
+            <Sparkline data={data.kpi.aum.sparkline} color="#22c55e" />
           </div>
         </div>
 
@@ -175,13 +265,20 @@ export function CashRunwayView() {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-2xl font-bold text-text-primary">${kpiData.burn.value}K</p>
+              <p className="text-2xl font-bold text-text-primary">
+                <InlineNumber
+                  value={data.kpi.burn.value}
+                  onSave={(v) => updateKpi('burn', 'value', v)}
+                  prefix="$"
+                  suffix="K"
+                />
+              </p>
               <p className="text-xs text-teal-400 mt-1 flex items-center gap-1">
                 <ArrowDownRight className="w-3 h-3" />
-                {kpiData.burn.delta} vs last month
+                {data.kpi.burn.delta} vs last month
               </p>
             </div>
-            <Sparkline data={kpiData.burn.sparkline} color="#eab308" />
+            <Sparkline data={data.kpi.burn.sparkline} color="#eab308" />
           </div>
         </div>
 
@@ -198,13 +295,20 @@ export function CashRunwayView() {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-2xl font-bold text-text-primary">${kpiData.revenue.value}K</p>
+              <p className="text-2xl font-bold text-text-primary">
+                <InlineNumber
+                  value={data.kpi.revenue.value}
+                  onSave={(v) => updateKpi('revenue', 'value', v)}
+                  prefix="$"
+                  suffix="K"
+                />
+              </p>
               <p className="text-xs text-success mt-1 flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3" />
-                {kpiData.revenue.delta} mgmt fees
+                {data.kpi.revenue.delta} mgmt fees
               </p>
             </div>
-            <Sparkline data={kpiData.revenue.sparkline} color="#14b8a6" />
+            <Sparkline data={data.kpi.revenue.sparkline} color="#14b8a6" />
           </div>
         </div>
 
@@ -221,13 +325,19 @@ export function CashRunwayView() {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-2xl font-bold text-text-primary">{kpiData.runway.value} months</p>
+              <p className="text-2xl font-bold text-text-primary">
+                <InlineNumber
+                  value={data.kpi.runway.value}
+                  onSave={(v) => updateKpi('runway', 'value', v)}
+                  suffix=" months"
+                />
+              </p>
               <p className="text-xs text-success mt-1 flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3" />
-                {kpiData.runway.delta} vs last quarter
+                {data.kpi.runway.delta} vs last quarter
               </p>
             </div>
-            <Sparkline data={kpiData.runway.sparkline} color="#3b82f6" />
+            <Sparkline data={data.kpi.runway.sparkline} color="#3b82f6" />
           </div>
         </div>
       </div>
@@ -246,7 +356,15 @@ export function CashRunwayView() {
             Current: <span className="text-text-primary font-semibold">${currentAUM}M</span>
           </span>
           <span className="text-text-secondary">
-            Break-even: <span className="text-teal-400 font-semibold">${breakEvenAUM}M</span>
+            Break-even:{' '}
+            <span className="text-teal-400 font-semibold">
+              <InlineNumber
+                value={data.breakEvenAUM}
+                onSave={(v) => setData((prev) => ({ ...prev, breakEvenAUM: v }))}
+                prefix="$"
+                suffix="M"
+              />
+            </span>
           </span>
         </div>
         <div className="h-3 bg-surface-3 rounded-full overflow-hidden">
@@ -256,7 +374,7 @@ export function CashRunwayView() {
           />
         </div>
         <p className="text-xs text-text-muted mt-2">
-          {Math.round(breakEvenProgress)}% of the way to break-even AUM ({`$${breakEvenAUM - currentAUM}M`} remaining)
+          {Math.round(breakEvenProgress)}% of the way to break-even AUM ({`$${data.breakEvenAUM - currentAUM}M`} remaining)
         </p>
       </div>
 
@@ -271,7 +389,7 @@ export function CashRunwayView() {
           <span className="text-xs text-text-muted ml-auto">Last 6 months (in $K)</span>
         </div>
         <div className="space-y-3">
-          {revenueVsPlan.map((item) => {
+          {data.revenueVsPlan.map((item, idx) => {
             const actualPercent = (item.actual / maxBar) * 100;
             const planPercent = (item.plan / maxBar) * 100;
             const isAbovePlan = item.actual >= item.plan;
@@ -297,8 +415,13 @@ export function CashRunwayView() {
                         style={{ width: `${actualPercent}%` }}
                       />
                     </div>
-                    <span className="text-xs font-mono text-text-primary w-8 text-right">
-                      ${item.actual}K
+                    <span className="text-xs font-mono text-text-primary w-16 text-right">
+                      <InlineNumber
+                        value={item.actual}
+                        onSave={(v) => updateRevPlan(idx, 'actual', v)}
+                        prefix="$"
+                        suffix="K"
+                      />
                     </span>
                   </div>
                   {/* Plan */}
@@ -309,8 +432,13 @@ export function CashRunwayView() {
                         style={{ width: `${planPercent}%` }}
                       />
                     </div>
-                    <span className="text-xs font-mono text-text-muted w-8 text-right">
-                      ${item.plan}K
+                    <span className="text-xs font-mono text-text-muted w-16 text-right">
+                      <InlineNumber
+                        value={item.plan}
+                        onSave={(v) => updateRevPlan(idx, 'plan', v)}
+                        prefix="$"
+                        suffix="K"
+                      />
                     </span>
                   </div>
                 </div>
@@ -344,7 +472,7 @@ export function CashRunwayView() {
           <h2 className="text-lg font-semibold text-text-primary">Scenario Modeling</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {scenarios.map((scenario, idx) => (
+          {data.scenarios.map((scenario, idx) => (
             <button
               key={scenario.name}
               onClick={() => setSelectedScenario(selectedScenario === idx ? null : idx)}
@@ -355,7 +483,10 @@ export function CashRunwayView() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className={`text-sm font-semibold ${scenario.color}`}>
-                    {scenario.name}
+                    <InlineText
+                      value={scenario.name}
+                      onSave={(v) => updateScenario(idx, 'name', v)}
+                    />
                   </h3>
                   <span
                     className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 ${scenario.badgeColor}`}
@@ -372,19 +503,28 @@ export function CashRunwayView() {
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-text-muted">Projected AUM (12mo)</span>
                   <span className="text-sm font-semibold text-text-primary">
-                    {scenario.projectedAUM}
+                    <InlineText
+                      value={scenario.projectedAUM}
+                      onSave={(v) => updateScenario(idx, 'projectedAUM', v)}
+                    />
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-text-muted">Monthly Revenue</span>
                   <span className="text-sm font-semibold text-text-primary">
-                    {scenario.projectedRevenue}
+                    <InlineText
+                      value={scenario.projectedRevenue}
+                      onSave={(v) => updateScenario(idx, 'projectedRevenue', v)}
+                    />
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-text-muted">Cash Runway</span>
                   <span className="text-sm font-semibold text-text-primary">
-                    {scenario.projectedRunway}
+                    <InlineText
+                      value={scenario.projectedRunway}
+                      onSave={(v) => updateScenario(idx, 'projectedRunway', v)}
+                    />
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -394,7 +534,10 @@ export function CashRunwayView() {
                       scenario.name === 'Downside' ? 'text-rose-400' : 'text-success'
                     }`}
                   >
-                    {scenario.aumGrowth}
+                    <InlineText
+                      value={scenario.aumGrowth}
+                      onSave={(v) => updateScenario(idx, 'aumGrowth', v)}
+                    />
                   </span>
                 </div>
               </div>
@@ -402,7 +545,11 @@ export function CashRunwayView() {
               {selectedScenario === idx && (
                 <div className={`mt-4 pt-4 border-t ${scenario.borderColor}`}>
                   <p className="text-xs text-text-secondary leading-relaxed">
-                    {scenario.description}
+                    <InlineText
+                      value={scenario.description}
+                      onSave={(v) => updateScenario(idx, 'description', v)}
+                      multiline
+                    />
                   </p>
                 </div>
               )}
@@ -418,26 +565,23 @@ export function CashRunwayView() {
       >
         <h3 className="text-sm font-semibold text-text-primary mb-3">Key Assumptions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-text-secondary">
-          <div className="bg-surface-2 rounded-lg p-3">
-            <p className="text-text-muted mb-1">Management Fee</p>
-            <p className="text-text-primary font-semibold">1% of AUM annually</p>
-            <p className="text-text-muted mt-1">~$40K/mo at $48M AUM</p>
-          </div>
-          <div className="bg-surface-2 rounded-lg p-3">
-            <p className="text-text-muted mb-1">Performance Fee</p>
-            <p className="text-text-primary font-semibold">20% over hurdle</p>
-            <p className="text-text-muted mt-1">Not included in base projections</p>
-          </div>
-          <div className="bg-surface-2 rounded-lg p-3">
-            <p className="text-text-muted mb-1">Burn Composition</p>
-            <p className="text-text-primary font-semibold">$85K/month</p>
-            <p className="text-text-muted mt-1">Team: $60K | Infra: $15K | Other: $10K</p>
-          </div>
-          <div className="bg-surface-2 rounded-lg p-3">
-            <p className="text-text-muted mb-1">Break-Even</p>
-            <p className="text-text-primary font-semibold">$65M AUM</p>
-            <p className="text-text-muted mt-1">Revenue covers burn at this level</p>
-          </div>
+          {data.assumptions.map((assumption, idx) => (
+            <div key={idx} className="bg-surface-2 rounded-lg p-3">
+              <p className="text-text-muted mb-1">{assumption.title}</p>
+              <p className="text-text-primary font-semibold">
+                <InlineText
+                  value={assumption.value}
+                  onSave={(v) => updateAssumption(idx, 'value', v)}
+                />
+              </p>
+              <p className="text-text-muted mt-1">
+                <InlineText
+                  value={assumption.detail}
+                  onSave={(v) => updateAssumption(idx, 'detail', v)}
+                />
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

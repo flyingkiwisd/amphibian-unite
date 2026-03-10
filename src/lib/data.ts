@@ -730,7 +730,7 @@ export const okrs: OKR[] = [
 ];
 
 export const kpis: KPI[] = [
-  { id: 'kpi-1', name: 'AUM', value: '$100M+', target: '$1B+', trend: 'up', category: 'Growth' },
+  { id: 'kpi-1', name: 'AUM', value: '$80-100M', target: '$1B+', trend: 'flat', category: 'Growth' },
   { id: 'kpi-2', name: 'Edge Rating', value: '5.1/10', target: '7.0/10', trend: 'flat', category: 'Strategy' },
   { id: 'kpi-3', name: 'BTC Alpha YTD', value: '-3.08%', target: '+20 bps/mo', trend: 'down', category: 'Performance' },
   { id: 'kpi-4', name: 'USD Alpha YTD', value: '+3.59%', target: '+10%+', trend: 'up', category: 'Performance' },
