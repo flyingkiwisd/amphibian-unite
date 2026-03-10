@@ -16,7 +16,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { teamMembers } from '@/lib/data';
+import { teamMembers, memberIdToOwnerName } from '@/lib/data';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, InlineSelect, EditBanner } from '@/components/InlineEdit';
 
@@ -226,12 +226,23 @@ const formatDisplayDate = (dateStr: string) => {
 
 // ── Component ──────────────────────────────────────────────
 
-export function MeetingIntelView() {
+export function MeetingIntelView({ currentUser }: { currentUser?: string }) {
   const { data: meetings, setData: setMeetings, hasEdits, resetAll } = useEditableStore<Meeting[]>(
     'amphibian-unite-meeting-intel',
     defaultMeetings
   );
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['mtg-1']));
+
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] : undefined;
+  const [showMyMeetings, setShowMyMeetings] = useState(false);
+
+  // Find the first meeting where the current user is an attendee for auto-expand
+  const firstUserMeetingId = currentUser
+    ? meetings.find((m) => m.attendees.includes(currentUser))?.id
+    : undefined;
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+    new Set([firstUserMeetingId || 'mtg-1'])
+  );
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -259,13 +270,14 @@ export function MeetingIntelView() {
 
   const addMeeting = () => {
     const newId = `mtg-${Date.now()}`;
+    const defaultAttendees = currentUser ? [currentUser] : ['james'];
     const newMeeting: Meeting = {
       id: newId,
       title: 'New Meeting',
       date: formatMeetingDate(1),
       time: '10:00 AM',
       duration: '30 min',
-      attendees: ['james'],
+      attendees: defaultAttendees,
       type: 'strategic',
       status: 'upcoming',
       autoAgenda: [],
@@ -283,8 +295,20 @@ export function MeetingIntelView() {
     setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
   };
 
-  const upcomingMeetings = meetings.filter((m) => m.status === 'upcoming');
-  const completedMeetings = meetings.filter((m) => m.status === 'completed');
+  const filteredMeetings = showMyMeetings && currentUser
+    ? meetings.filter((m) => m.attendees.includes(currentUser))
+    : meetings;
+
+  const upcomingMeetings = filteredMeetings.filter((m) => m.status === 'upcoming');
+  const completedMeetings = filteredMeetings.filter((m) => m.status === 'completed');
+
+  // Personal stats: always based on user's meetings (not filter)
+  const myUpcomingCount = currentUser
+    ? meetings.filter((m) => m.status === 'upcoming' && m.attendees.includes(currentUser)).length
+    : 0;
+  const myActionItemCount = currentUser && ownerName
+    ? meetings.reduce((sum, m) => sum + m.actionItems.filter((a) => !a.done && a.owner === ownerName).length, 0)
+    : 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -330,6 +354,25 @@ export function MeetingIntelView() {
           <p className="text-xs text-text-muted mt-0.5">open</p>
         </div>
       </div>
+
+      {/* ── Personal Stats & Filter ── */}
+      {currentUser && (
+        <div className="flex items-center justify-between gap-4 px-1">
+          <p className="text-sm text-text-secondary">
+            Your meetings: <span className="font-semibold text-accent">{myUpcomingCount}</span> upcoming, <span className="font-semibold text-amber-400">{myActionItemCount}</span> action items assigned to you
+          </p>
+          <button
+            onClick={() => setShowMyMeetings((v) => !v)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+              showMyMeetings
+                ? 'bg-accent/15 text-accent border-accent/30'
+                : 'bg-surface border-border text-text-muted hover:text-text-secondary hover:border-border'
+            }`}
+          >
+            {showMyMeetings ? 'My Meetings' : 'All Meetings'}
+          </button>
+        </div>
+      )}
 
       {/* ── Add Meeting Button ── */}
       <button
@@ -403,16 +446,24 @@ export function MeetingIntelView() {
                   </button>
                   <div className="flex items-center gap-3">
                     {/* Attendee avatars */}
-                    <div className="hidden sm:flex -space-x-2">
-                      {meeting.attendees.slice(0, 4).map((id) => {
-                        const m = getMember(id);
-                        if (!m) return null;
-                        return (
-                          <div key={id} className={`w-7 h-7 rounded-full ${m.color} flex items-center justify-center text-white text-[10px] font-bold border-2 border-surface`}>
-                            {m.avatar}
-                          </div>
-                        );
-                      })}
+                    <div className="hidden sm:flex items-center gap-1">
+                      <div className="flex -space-x-2">
+                        {meeting.attendees.slice(0, 4).map((id) => {
+                          const m = getMember(id);
+                          if (!m) return null;
+                          const isCurrentUser = id === currentUser;
+                          return (
+                            <div key={id} className="flex flex-col items-center gap-0.5">
+                              <div className={`w-7 h-7 rounded-full ${m.color} flex items-center justify-center text-white text-[10px] font-bold border-2 ${isCurrentUser ? 'ring-2 ring-accent border-surface' : 'border-surface'}`}>
+                                {m.avatar}
+                              </div>
+                              {isCurrentUser && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                     <button
                       onClick={() => deleteMeeting(meeting.id)}
@@ -743,13 +794,16 @@ export function MeetingIntelView() {
                         <div className="space-y-2">
                           {meeting.actionItems.map((action, i) => {
                             const ownerMember = getMember(action.owner.toLowerCase());
+                            const isMyAction = ownerName && action.owner === ownerName;
                             return (
                               <div
                                 key={i}
                                 className={`flex items-start gap-3 p-2.5 rounded-lg border transition-all ${
-                                  action.done
-                                    ? 'bg-surface/30 border-border/50'
-                                    : 'bg-surface/50 border-amber-500/20'
+                                  isMyAction
+                                    ? 'border-l-2 border-accent bg-accent/5'
+                                    : action.done
+                                      ? 'bg-surface/30 border-border/50'
+                                      : 'bg-surface/50 border-amber-500/20'
                                 }`}
                               >
                                 <button

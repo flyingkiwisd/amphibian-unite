@@ -228,7 +228,7 @@ const statusOptions = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-export function LPHealthView() {
+export function LPHealthView({ currentUser }: { currentUser?: string }) {
   const { data: lpList, setData: setLPList, hasEdits, resetAll } = useEditableStore<LP[]>(
     'amphibian-unite-lp-health',
     defaultLPs

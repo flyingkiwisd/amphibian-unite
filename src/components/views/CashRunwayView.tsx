@@ -148,7 +148,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-export function CashRunwayView() {
+export function CashRunwayView({ currentUser }: { currentUser?: string }) {
   const { data, setData, hasEdits, resetAll } = useEditableStore<CashRunwayData>(
     'amphibian-unite-cash-runway',
     defaultData

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   GitBranch,
   ArrowRight,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, EditBanner } from '@/components/InlineEdit';
+import { memberIdToOwnerName } from '@/lib/data';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -217,18 +218,52 @@ const relationshipLabels: Record<string, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-export function KnowledgeGraphView() {
+export function KnowledgeGraphView({ currentUser }: { currentUser?: string }) {
   const { data, setData, hasEdits, resetAll } = useEditableStore<KnowledgeGraphData>(
     'amphibian-unite-knowledge-graph',
     defaultData
   );
 
   const chains = data.chains;
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] : undefined;
 
-  const [selectedChain, setSelectedChain] = useState<string>(chains[0]?.id || '');
+  // Helper: does a chain contain a person node matching the current user?
+  const chainHasOwner = (chain: LinkedChain) =>
+    ownerName ? chain.nodes.some((n) => n.type === 'person' && n.label === ownerName) : false;
+
+  // Auto-select the first chain where the user is an owner (if any), otherwise default to first chain
+  const initialChainId = useMemo(() => {
+    if (ownerName) {
+      const owned = chains.find((c) => chainHasOwner(c));
+      if (owned) return owned.id;
+    }
+    return chains[0]?.id || '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [selectedChain, setSelectedChain] = useState<string>(initialChainId);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
   const activeChain = chains.find((c) => c.id === selectedChain) || chains[0];
+
+  // Personal workload summary
+  const workloadSummary = useMemo(() => {
+    if (!ownerName) return null;
+    let chainCount = 0;
+    let decisionCount = 0;
+    let riskCount = 0;
+
+    for (const chain of chains) {
+      const isInChain = chain.nodes.some((n) => n.type === 'person' && n.label === ownerName);
+      if (isInChain) {
+        chainCount++;
+        decisionCount += chain.nodes.filter((n) => n.type === 'decision').length;
+        riskCount += chain.nodes.filter((n) => n.type === 'risk').length;
+      }
+    }
+
+    return { chains: chainCount, decisions: decisionCount, risks: riskCount };
+  }, [chains, ownerName]);
 
   const updateChain = (chainId: string, updater: (c: LinkedChain) => LinkedChain) => {
     setData((prev) => ({
@@ -311,41 +346,70 @@ export function KnowledgeGraphView() {
         })}
       </div>
 
+      {/* ── Personal Workload Summary ── */}
+      {workloadSummary && (
+        <div
+          className="animate-fade-in flex items-center gap-4 rounded-xl bg-accent/5 border border-accent/20 px-5 py-3"
+          style={{ animationDelay: '125ms', opacity: 0 }}
+        >
+          <User className="w-4 h-4 text-accent" />
+          <span className="text-sm font-semibold text-accent">
+            Your Chains: {workloadSummary.chains}
+          </span>
+          <span className="text-text-muted">|</span>
+          <span className="text-sm text-text-secondary">
+            Decisions: {workloadSummary.decisions}
+          </span>
+          <span className="text-text-muted">|</span>
+          <span className="text-sm text-text-secondary">
+            Risks: {workloadSummary.risks}
+          </span>
+        </div>
+      )}
+
       {/* ── Chain Selector ── */}
       <div
         className="animate-fade-in"
         style={{ animationDelay: '150ms', opacity: 0 }}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {chains.map((chain) => (
-            <button
-              key={chain.id}
-              onClick={() => {
-                setSelectedChain(chain.id);
-                setSelectedNode(null);
-              }}
-              className={`text-left rounded-xl p-4 transition-all duration-300 border ${
-                selectedChain === chain.id
-                  ? 'bg-teal-500/10 border-teal-500/30'
-                  : 'bg-surface border-border hover:border-border-2'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Layers className={`w-4 h-4 ${selectedChain === chain.id ? 'text-teal-400' : 'text-text-muted'}`} />
-                <h3 className={`text-sm font-semibold ${selectedChain === chain.id ? 'text-teal-400' : 'text-text-primary'}`}>
-                  <InlineText
-                    value={chain.name}
-                    onSave={(v) => updateChain(chain.id, (c) => ({ ...c, name: v }))}
-                  />
-                </h3>
-              </div>
-              <InlineText
-                value={chain.description}
-                onSave={(v) => updateChain(chain.id, (c) => ({ ...c, description: v }))}
-                className="text-xs text-text-muted"
-              />
-            </button>
-          ))}
+          {chains.map((chain) => {
+            const isUserChain = chainHasOwner(chain);
+            return (
+              <button
+                key={chain.id}
+                onClick={() => {
+                  setSelectedChain(chain.id);
+                  setSelectedNode(null);
+                }}
+                className={`text-left rounded-xl p-4 transition-all duration-300 border ${
+                  selectedChain === chain.id
+                    ? 'bg-teal-500/10 border-teal-500/30'
+                    : 'bg-surface border-border hover:border-border-2'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Layers className={`w-4 h-4 ${selectedChain === chain.id ? 'text-teal-400' : 'text-text-muted'}`} />
+                  <h3 className={`text-sm font-semibold ${selectedChain === chain.id ? 'text-teal-400' : 'text-text-primary'}`}>
+                    <InlineText
+                      value={chain.name}
+                      onSave={(v) => updateChain(chain.id, (c) => ({ ...c, name: v }))}
+                    />
+                  </h3>
+                  {isUserChain && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+                      Your Chain
+                    </span>
+                  )}
+                </div>
+                <InlineText
+                  value={chain.description}
+                  onSave={(v) => updateChain(chain.id, (c) => ({ ...c, description: v }))}
+                  className="text-xs text-text-muted"
+                />
+              </button>
+            );
+          })}
         </div>
         <button
           onClick={addChain}
@@ -393,6 +457,7 @@ export function KnowledgeGraphView() {
               const conf = nodeConfig[node.type];
               const Icon = conf.icon;
               const isSelected = selectedNode === node.id;
+              const isCurrentUser = node.type === 'person' && ownerName && node.label === ownerName;
 
               // Find relationship leading TO this node
               const incomingEdge = activeChain.edges.find((e) => e.to === node.id);
@@ -421,9 +486,11 @@ export function KnowledgeGraphView() {
                       setSelectedNode(isSelected ? null : node.id)
                     }
                     className={`w-full text-left rounded-xl p-4 border transition-all duration-300 ${
-                      isSelected
-                        ? `${conf.bg} ${conf.border}`
-                        : 'bg-surface-2 border-border hover:border-border-2'
+                      isCurrentUser
+                        ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                        : isSelected
+                          ? `${conf.bg} ${conf.border}`
+                          : 'bg-surface-2 border-border hover:border-border-2'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -442,6 +509,11 @@ export function KnowledgeGraphView() {
                               onSave={() => {/* type label is from config, not editable per-node */}}
                             />
                           </span>
+                          {isCurrentUser && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+                              You
+                            </span>
+                          )}
                         </div>
                         <h3 className="text-sm font-semibold text-text-primary mt-1">
                           <InlineText
@@ -528,7 +600,7 @@ export function KnowledgeGraphView() {
           Decisions and risks that appear across multiple chains, revealing systemic patterns.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-surface-2 rounded-lg p-4">
+          <div className={`bg-surface-2 rounded-lg p-4 ${ownerName === 'James' ? 'border-l-2 border-l-accent' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
               <User className="w-4 h-4 text-amber-400" />
               <h4 className="text-sm font-semibold text-text-primary">James</h4>
@@ -565,7 +637,7 @@ export function KnowledgeGraphView() {
               </span>
             </div>
           </div>
-          <div className="bg-surface-2 rounded-lg p-4">
+          <div className={`bg-surface-2 rounded-lg p-4 ${ownerName === 'Ross' ? 'border-l-2 border-l-accent' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
               <User className="w-4 h-4 text-amber-400" />
               <h4 className="text-sm font-semibold text-text-primary">Ross</h4>

@@ -62,7 +62,7 @@ const statusOptions = [
   { label: 'LOW', value: 'LOW', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
 ];
 
-export function AIEdgeView() {
+export function AIEdgeView({ currentUser }: { currentUser?: string }) {
   const currentRating = edgeAssessment.bridgeV3Rating;
   const andrewRating = edgeAssessment.andrewConsensusRating;
   const targetRating = 8.5;

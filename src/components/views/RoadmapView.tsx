@@ -95,7 +95,7 @@ const statusOptions = [
   { label: 'Future', value: 'future', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
 ];
 
-export function RoadmapView() {
+export function RoadmapView({ currentUser }: { currentUser?: string }) {
   const { data: phases, setData: setPhases, hasEdits, resetAll } = useEditableStore(
     'amphibian-unite-roadmap',
     roadmapPhases

@@ -170,16 +170,22 @@ function getDriftBarColor(score: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-export function RoleDriftView() {
+export function RoleDriftView({ currentUser }: { currentUser?: string }) {
   const { data: driftData, setData: setDriftData, hasEdits, resetAll } = useEditableStore<MemberDrift[]>(
     'amphibian-unite-role-drift',
     defaultDriftData
   );
 
-  const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  const [expandedMember, setExpandedMember] = useState<string | null>(currentUser ?? null);
 
-  // Sort by drift score descending
-  const sortedDrift = [...driftData].sort((a, b) => b.driftScore - a.driftScore);
+  // Sort current user first, then by drift score descending
+  const sortedDrift = [...driftData].sort((a, b) => {
+    if (currentUser) {
+      if (a.memberId === currentUser) return -1;
+      if (b.memberId === currentUser) return 1;
+    }
+    return b.driftScore - a.driftScore;
+  });
 
   // Team-wide stats
   const avgDrift = Math.round(
@@ -234,6 +240,58 @@ export function RoleDriftView() {
           doing. Catch misalignment before it becomes a problem.
         </p>
       </div>
+
+      {/* ── Personal Summary ── */}
+      {currentUser && (() => {
+        const myDrift = driftData.find((d) => d.memberId === currentUser);
+        if (!myDrift) return null;
+        const myStatus = getDriftStatus(myDrift.driftScore);
+        const myInSeat = myDrift.recentActivities.filter((a) => a.isInSeat).length;
+        const myOutSeat = myDrift.recentActivities.filter((a) => !a.isInSeat).length;
+        const statusColorMap: Record<string, string> = {
+          'text-success': 'from-green-500 to-emerald-600',
+          'text-warning': 'from-amber-500 to-orange-500',
+          'text-danger': 'from-rose-500 to-red-600',
+        };
+        const gradientBorder = statusColorMap[myStatus.color] ?? 'from-teal-500 to-cyan-500';
+
+        return (
+          <div
+            className="animate-fade-in"
+            style={{ animationDelay: '50ms', opacity: 0 }}
+          >
+            <div className="bg-surface border border-border rounded-xl p-5 flex items-center gap-5 relative overflow-hidden">
+              {/* Status-colored gradient left border */}
+              <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${gradientBorder}`} />
+              <div className="pl-3 flex-1 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <Compass className={`w-5 h-5 ${myStatus.color}`} />
+                  <div>
+                    <p className="text-xs text-text-muted uppercase tracking-wider mb-0.5">Your Drift</p>
+                    <span className={`text-2xl font-bold ${myStatus.color}`}>{myDrift.driftScore}%</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs px-2 py-1 rounded-full ${myStatus.bg} ${myStatus.color} flex items-center gap-1`}>
+                    <myStatus.icon className="w-3 h-3" />
+                    {myStatus.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-text-muted">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-success" />
+                    {myInSeat} in-seat
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-rose-400" />
+                    {myOutSeat} out-of-seat
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Team Summary ── */}
       <div
@@ -296,21 +354,26 @@ export function RoleDriftView() {
             const status = getDriftStatus(d.driftScore);
             if (!member) return null;
 
+            const isCurrentUser = currentUser === d.memberId;
+
             return (
               <button
                 key={d.memberId}
                 onClick={() => setExpandedMember(expandedMember === d.memberId ? null : d.memberId)}
                 className={`rounded-lg p-3 text-center transition-all duration-300 border ${
                   expandedMember === d.memberId ? status.border : 'border-transparent'
-                } ${status.bg} hover:scale-105`}
+                } ${status.bg} hover:scale-105${isCurrentUser ? ' ring-2 ring-accent/40' : ''}`}
               >
                 <div
                   className={`w-10 h-10 rounded-full ${member.color} flex items-center justify-center text-white text-xs font-bold mx-auto`}
                 >
                   {member.avatar}
                 </div>
-                <p className="text-xs font-semibold text-text-primary mt-2">
+                <p className="text-xs font-semibold text-text-primary mt-2 flex items-center justify-center gap-1">
                   {member.name.split(' ')[0]}
+                  {isCurrentUser && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+                  )}
                 </p>
                 <p className={`text-lg font-bold ${status.color} mt-1`}>{d.driftScore}%</p>
               </button>
@@ -347,6 +410,7 @@ export function RoleDriftView() {
 
           if (!member) return null;
 
+          const isCurrentUser = currentUser === d.memberId;
           const driftItems = d.recentActivities.filter((a) => !a.isInSeat);
           const inSeatItems = d.recentActivities.filter((a) => a.isInSeat);
 
@@ -359,12 +423,15 @@ export function RoleDriftView() {
             .filter((i) => i !== -1);
 
           return (
-            <button
+            <div
               key={d.memberId}
               onClick={() => setExpandedMember(isExpanded ? null : d.memberId)}
-              className={`w-full text-left glow-card bg-surface border rounded-xl p-5 transition-all duration-300 hover:border-border-2 ${
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedMember(isExpanded ? null : d.memberId); }}
+              className={`w-full text-left glow-card bg-surface border rounded-xl p-5 transition-all duration-300 hover:border-border-2 cursor-pointer ${
                 isExpanded ? status.border : 'border-border'
-              }`}
+              }${isCurrentUser ? ' ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30' : ''}`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 {/* Avatar & Name */}
@@ -375,7 +442,12 @@ export function RoleDriftView() {
                     {member.avatar}
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-text-primary">{member.name}</h3>
+                    <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                      {member.name}
+                      {isCurrentUser && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+                      )}
+                    </h3>
                     <p className="text-xs text-text-muted">{member.shortRole}</p>
                   </div>
                 </div>
@@ -549,7 +621,7 @@ export function RoleDriftView() {
                   </div>
                 </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

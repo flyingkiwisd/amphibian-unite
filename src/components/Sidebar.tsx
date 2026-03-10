@@ -75,6 +75,7 @@ export function Sidebar({
   const user = teamMembers.find((m) => m.id === currentUser);
   const initials = user?.avatar ?? '??';
   const userName = user?.name ?? 'Unknown';
+  const userRole = user?.shortRole ?? '';
 
   const groups = [1, 2, 3, 4];
 
@@ -226,15 +227,22 @@ export function Sidebar({
       {/* User Section */}
       <div style={{ borderTop: '1px solid #1e293b', padding: collapsed ? '16px 0' : '16px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 12, flexShrink: 0 }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <div title={collapsed ? userName : undefined} style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#f0fdfa', letterSpacing: '0.02em' }}>
+          <div title={collapsed ? `${userName} · ${userRole}` : undefined} style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#f0fdfa', letterSpacing: '0.02em', boxShadow: '0 0 12px rgba(20, 184, 166, 0.25)' }}>
             {initials}
           </div>
           <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid #111827' }} />
         </div>
         {!collapsed && (
           <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
-            <div style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</span>
+              {userRole && (
+                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, backgroundColor: 'rgba(20, 184, 166, 0.15)', color: '#5eead4', border: '1px solid rgba(20, 184, 166, 0.3)', letterSpacing: '0.05em', flexShrink: 0 }}>
+                  {userRole}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
               Online
             </div>

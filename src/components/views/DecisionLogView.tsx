@@ -13,7 +13,9 @@ import {
   AlertCircle,
   XCircle,
   FileText,
+  Sparkles,
 } from 'lucide-react';
+import { memberIdToOwnerName } from '@/lib/data';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -213,11 +215,17 @@ const emptyForm = {
 
 // ── Component ───────────────────────────────────────────────
 
-export function DecisionLogView() {
+export function DecisionLogView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] : undefined;
+
   const [decisions, setDecisions] = useState<Decision[]>(initialDecisions);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [showMineOnly, setShowMineOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({
+    ...emptyForm,
+    decidedBy: ownerName || emptyForm.decidedBy,
+  });
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // ── Counts ──
@@ -228,12 +236,27 @@ export function DecisionLogView() {
     reversed: decisions.filter((d) => d.status === 'reversed').length,
   };
 
+  // ── User involvement helpers ──
+  const isUserInvolved = (d: Decision) =>
+    ownerName ? d.decidedBy === ownerName || d.affected.includes(ownerName) : false;
+  const isUserDecider = (d: Decision) => (ownerName ? d.decidedBy === ownerName : false);
+  const isUserAffected = (d: Decision) =>
+    ownerName ? d.affected.includes(ownerName) && d.decidedBy !== ownerName : false;
+
+  const myDecisionsCount = ownerName ? decisions.filter(isUserInvolved).length : 0;
+  const myDecidedCount = ownerName ? decisions.filter(isUserDecider).length : 0;
+  const myAffectedCount = ownerName
+    ? decisions.filter((d) => d.affected.includes(ownerName) && d.decidedBy !== ownerName).length
+    : 0;
+
   // ── Filtered and sorted (newest first) ──
   const filteredDecisions = (
     categoryFilter === 'all'
       ? decisions
       : decisions.filter((d) => d.category === categoryFilter)
-  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  )
+    .filter((d) => (showMineOnly && ownerName ? isUserInvolved(d) : true))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // ── Toggle expand ──
   const toggleExpand = (id: string) => {
@@ -275,7 +298,7 @@ export function DecisionLogView() {
     };
 
     setDecisions((prev) => [newDecision, ...prev]);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, decidedBy: ownerName || emptyForm.decidedBy });
     setShowForm(false);
   };
 
@@ -329,6 +352,33 @@ export function DecisionLogView() {
         ))}
       </div>
 
+      {/* ── Personal Stats Card ── */}
+      {ownerName && (
+        <div
+          className="glow-card bg-surface rounded-xl border border-accent/30 p-5 animate-fade-in ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)]"
+          style={{ animationDelay: '120ms', opacity: 0 }}
+        >
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-accent" />
+            <h2 className="text-sm font-semibold text-text-primary">Your Decisions</h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+              {ownerName}
+            </span>
+          </div>
+          <div className="flex items-center gap-6 mt-3">
+            <div>
+              <p className="text-2xl font-bold text-accent">{myDecidedCount}</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-text-muted">Decided</p>
+            </div>
+            <div className="w-px h-8 bg-border" />
+            <div>
+              <p className="text-2xl font-bold text-teal-400">{myAffectedCount}</p>
+              <p className="text-xs font-medium uppercase tracking-wider text-text-muted">Affected</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Controls Bar ── */}
       <div
         className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-surface border border-border rounded-xl p-4 animate-fade-in"
@@ -350,6 +400,28 @@ export function DecisionLogView() {
               {fb.label}
             </button>
           ))}
+          {/* My Decisions filter */}
+          {ownerName && (
+            <button
+              onClick={() => setShowMineOnly(!showMineOnly)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 inline-flex items-center gap-1.5 ${
+                showMineOnly
+                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                  : 'bg-surface-3 text-text-muted hover:text-text-secondary hover:bg-surface-2'
+              }`}
+            >
+              My Decisions
+              <span
+                className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                  showMineOnly
+                    ? 'bg-white/20 text-white'
+                    : 'bg-accent/15 text-accent'
+                }`}
+              >
+                {myDecisionsCount}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Right: Log New Decision button */}
@@ -495,7 +567,7 @@ export function DecisionLogView() {
             <button
               onClick={() => {
                 setShowForm(false);
-                setForm(emptyForm);
+                setForm({ ...emptyForm, decidedBy: ownerName || emptyForm.decidedBy });
               }}
               className="px-4 py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-2 border border-border transition-all duration-200"
             >
@@ -520,6 +592,8 @@ export function DecisionLogView() {
           const statConf = statusConfig[decision.status];
           const StatusIcon = statConf.icon;
           const isExpanded = expandedIds.has(decision.id);
+          const userIsDecider = isUserDecider(decision);
+          const userIsAffected = isUserAffected(decision);
 
           return (
             <div
@@ -549,6 +623,17 @@ export function DecisionLogView() {
                         <StatusIcon className="w-3 h-3" />
                         {statConf.label}
                       </span>
+                      {/* User involvement badge */}
+                      {userIsDecider && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+                          You decided
+                        </span>
+                      )}
+                      {userIsAffected && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+                          Affects you
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -588,11 +673,16 @@ export function DecisionLogView() {
                     <span
                       key={person}
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${
-                        ownerColors[person] || 'bg-surface-3 text-text-muted border-border'
+                        person === ownerName
+                          ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30 text-accent'
+                          : ownerColors[person] || 'bg-surface-3 text-text-muted border-border'
                       }`}
                     >
                       <User className="w-2.5 h-2.5" />
                       {person}
+                      {person === ownerName && (
+                        <span className="text-[9px] font-bold uppercase text-accent ml-0.5">You</span>
+                      )}
                     </span>
                   ))}
                 </div>

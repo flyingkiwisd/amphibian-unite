@@ -60,26 +60,26 @@ export default function Home() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard': return <DashboardView onNavigate={handleNavigate} currentUser={currentUser ?? 'james'} />;
-      case 'agents': return <AgentsView />;
+      case 'agents': return <AgentsView currentUser={currentUser ?? 'james'} />;
       case 'team': return <TeamView currentUser={currentUser ?? 'james'} />;
       case 'okrs': return <OKRView currentUser={currentUser ?? 'james'} />;
       case 'tasks': return <TasksView currentUser={currentUser ?? 'james'} />;
-      case 'roadmap': return <RoadmapView />;
-      case 'ai-edge': return <AIEdgeView />;
-      case 'decisions': return <DecisionLogView />;
+      case 'roadmap': return <RoadmapView currentUser={currentUser ?? 'james'} />;
+      case 'ai-edge': return <AIEdgeView currentUser={currentUser ?? 'james'} />;
+      case 'decisions': return <DecisionLogView currentUser={currentUser ?? 'james'} />;
       case 'notes': return <NotesView currentUser={currentUser ?? 'james'} />;
       case 'activity': return <ActivityView currentUser={currentUser ?? 'james'} />;
       case 'leaderboard': return <LeaderboardView currentUser={currentUser ?? 'james'} />;
       case 'accountability': return <AccountabilityView currentUser={currentUser ?? 'james'} />;
       case 'founder-alignment': return <FounderAlignmentView currentUser={currentUser ?? 'james'} />;
-      case 'meeting-intel': return <MeetingIntelView />;
+      case 'meeting-intel': return <MeetingIntelView currentUser={currentUser ?? 'james'} />;
       case 'what-changed': return <WhatChangedView currentUser={currentUser ?? 'james'} />;
       case 'peer-feedback': return <PeerFeedbackView currentUser={currentUser ?? 'james'} />;
-      case 'cash-runway': return <CashRunwayView />;
-      case 'lp-health': return <LPHealthView />;
-      case 'competitive-intel': return <CompetitiveIntelView />;
-      case 'knowledge-graph': return <KnowledgeGraphView />;
-      case 'role-drift': return <RoleDriftView />;
+      case 'cash-runway': return <CashRunwayView currentUser={currentUser ?? 'james'} />;
+      case 'lp-health': return <LPHealthView currentUser={currentUser ?? 'james'} />;
+      case 'competitive-intel': return <CompetitiveIntelView currentUser={currentUser ?? 'james'} />;
+      case 'knowledge-graph': return <KnowledgeGraphView currentUser={currentUser ?? 'james'} />;
+      case 'role-drift': return <RoleDriftView currentUser={currentUser ?? 'james'} />;
       default: return <DashboardView onNavigate={handleNavigate} currentUser={currentUser ?? 'james'} />;
     }
   };
@@ -105,7 +105,9 @@ export default function Home() {
       >
         <style>{`@media (min-width: 768px) { main { margin-left: ${sidebarCollapsed ? 72 : 260}px !important; } }`}</style>
         <div className="p-4 md:p-6 lg:p-8 pb-24 md:pb-8 max-w-[1600px] mx-auto">
-          {renderView()}
+          <div key={currentView} className="animate-fade-in">
+            {renderView()}
+          </div>
         </div>
       </main>
 

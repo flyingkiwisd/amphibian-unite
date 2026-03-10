@@ -103,7 +103,7 @@ const priorityOptions = [
   { label: 'Low', value: 'low', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
 ];
 
-export function AgentsView() {
+export function AgentsView({ currentUser }: { currentUser?: string }) {
   const { data: agentsData, setData: setAgents, hasEdits, resetAll } = useEditableStore(
     'amphibian-unite-agents',
     defaultAgents

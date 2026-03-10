@@ -171,7 +171,7 @@ const categoryOptions = allCategories.map((cat) => ({
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-export function CompetitiveIntelView() {
+export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) {
   const { data, setData, hasEdits, resetAll } = useEditableStore<CompetitiveIntelData>(
     'amphibian-unite-competitive-intel',
     defaultData
