@@ -11,11 +11,15 @@ import {
   Cpu,
   ChevronLeft,
   ChevronRight,
-  LogOut,
+  Scale,
+  StickyNote,
+  Activity,
+  Search,
+  Trophy,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 
-type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge';
+type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard';
 
 interface SidebarProps {
   currentView: string;
@@ -23,6 +27,7 @@ interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   currentUser: string | null;
+  onOpenSearch?: () => void;
 }
 
 const navItems: { label: string; icon: React.ElementType; view: ViewType; group: number }[] = [
@@ -31,7 +36,11 @@ const navItems: { label: string; icon: React.ElementType; view: ViewType; group:
   { label: 'Team', icon: Users, view: 'team', group: 1 },
   { label: 'OKRs & KPIs', icon: Target, view: 'okrs', group: 2 },
   { label: 'Tasks', icon: CheckSquare, view: 'tasks', group: 2 },
+  { label: 'Decisions', icon: Scale, view: 'decisions', group: 2 },
   { label: 'Roadmap', icon: Map, view: 'roadmap', group: 2 },
+  { label: 'Leaderboard', icon: Trophy, view: 'leaderboard', group: 2 },
+  { label: 'Notes', icon: StickyNote, view: 'notes', group: 3 },
+  { label: 'Activity', icon: Activity, view: 'activity', group: 3 },
   { label: 'AI Edge', icon: Cpu, view: 'ai-edge', group: 3 },
 ];
 
@@ -41,12 +50,12 @@ export function Sidebar({
   collapsed,
   onToggleCollapse,
   currentUser,
+  onOpenSearch,
 }: SidebarProps) {
   const user = teamMembers.find((m) => m.id === currentUser);
   const initials = user?.avatar ?? '??';
   const userName = user?.name ?? 'Unknown';
 
-  // Group nav items and insert separators
   const groups = [1, 2, 3];
 
   return (
@@ -67,7 +76,7 @@ export function Sidebar({
         overflow: 'hidden',
       }}
     >
-      {/* ── Top Section: Logo + Collapse Toggle ── */}
+      {/* Logo + Collapse Toggle */}
       <div
         style={{
           display: 'flex',
@@ -78,196 +87,114 @@ export function Sidebar({
           flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {/* Frog SVG Logo */}
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 32 32"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ flexShrink: 0 }}
-          >
-            {/* Frog body */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
             <ellipse cx="16" cy="18" rx="11" ry="9" fill="#0d9488" />
-            {/* Left eye */}
             <circle cx="10" cy="10" r="5" fill="#14b8a6" />
             <circle cx="10" cy="10" r="3" fill="#111827" />
             <circle cx="11" cy="9" r="1" fill="#5eead4" />
-            {/* Right eye */}
             <circle cx="22" cy="10" r="5" fill="#14b8a6" />
             <circle cx="22" cy="10" r="3" fill="#111827" />
             <circle cx="23" cy="9" r="1" fill="#5eead4" />
-            {/* Mouth */}
-            <path
-              d="M10 21 Q16 25 22 21"
-              stroke="#0f766e"
-              strokeWidth="1.5"
-              fill="none"
-              strokeLinecap="round"
-            />
+            <path d="M10 21 Q16 25 22 21" stroke="#0f766e" strokeWidth="1.5" fill="none" strokeLinecap="round" />
           </svg>
-
           {!collapsed && (
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                color: '#e2e8f0',
-                fontFamily: 'inherit',
-              }}
-            >
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.1em', color: '#e2e8f0' }}>
               AMPHIBIAN UNITE
             </span>
           )}
         </div>
-
         {!collapsed && (
-          <button
-            onClick={onToggleCollapse}
-            title="Collapse sidebar"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 4,
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#94a3b8',
-              transition: 'background 0.15s, color 0.15s',
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#1e293b';
-              e.currentTarget.style.color = '#e2e8f0';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = '#94a3b8';
-            }}
+          <button onClick={onToggleCollapse} title="Collapse sidebar" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', transition: 'background 0.15s, color 0.15s', flexShrink: 0 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#1e293b'; e.currentTarget.style.color = '#e2e8f0'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}
           >
             <ChevronLeft size={18} />
           </button>
         )}
-
         {collapsed && (
-          <button
-            onClick={onToggleCollapse}
-            title="Expand sidebar"
-            style={{
-              position: 'absolute',
-              top: 20,
-              right: -12,
-              width: 24,
-              height: 24,
-              borderRadius: '50%',
-              backgroundColor: '#1e293b',
-              border: '1px solid #334155',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#94a3b8',
-              padding: 0,
-              transition: 'background 0.15s, color 0.15s',
-              zIndex: 60,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#334155';
-              e.currentTarget.style.color = '#e2e8f0';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#1e293b';
-              e.currentTarget.style.color = '#94a3b8';
-            }}
+          <button onClick={onToggleCollapse} title="Expand sidebar" style={{ position: 'absolute', top: 20, right: -12, width: 24, height: 24, borderRadius: '50%', backgroundColor: '#1e293b', border: '1px solid #334155', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: 0, transition: 'background 0.15s, color 0.15s', zIndex: 60 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#334155'; e.currentTarget.style.color = '#e2e8f0'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#1e293b'; e.currentTarget.style.color = '#94a3b8'; }}
           >
             <ChevronRight size={14} />
           </button>
         )}
       </div>
 
-      {/* ── Navigation ── */}
-      <nav
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          padding: collapsed ? '12px 0' : '12px 8px',
-        }}
-      >
+      {/* Search Button */}
+      {onOpenSearch && (
+        <div style={{ padding: collapsed ? '8px 12px' : '8px 16px', flexShrink: 0 }}>
+          <button
+            onClick={onOpenSearch}
+            title={collapsed ? 'Search (Cmd+K)' : undefined}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              padding: collapsed ? '8px 0' : '8px 12px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              border: '1px solid #1e293b',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 13,
+              color: '#64748b',
+              backgroundColor: '#0f172a',
+              transition: 'border-color 0.15s, color 0.15s',
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.color = '#94a3b8'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1e293b'; e.currentTarget.style.color = '#64748b'; }}
+          >
+            <Search size={16} style={{ flexShrink: 0 }} />
+            {!collapsed && (
+              <>
+                <span style={{ flex: 1, textAlign: 'left' }}>Search...</span>
+                <span style={{ fontSize: 11, backgroundColor: '#1e293b', borderRadius: 4, padding: '2px 6px', color: '#64748b' }}>
+                  ⌘K
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Navigation */}
+      <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: collapsed ? '8px 0' : '8px 8px' }}>
         {groups.map((group, gi) => (
           <React.Fragment key={group}>
             {gi > 0 && (
-              <div
-                style={{
-                  height: 1,
-                  backgroundColor: '#1e293b',
-                  margin: collapsed ? '8px 12px' : '8px 8px',
-                }}
-              />
+              <div style={{ height: 1, backgroundColor: '#1e293b', margin: collapsed ? '8px 12px' : '8px 8px' }} />
             )}
             {navItems
               .filter((item) => item.group === group)
               .map((item) => {
                 const isActive = currentView === item.view;
                 const Icon = item.icon;
-
                 return (
                   <button
                     key={item.view}
                     onClick={() => onViewChange(item.view)}
                     title={collapsed ? item.label : undefined}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      width: '100%',
-                      padding: collapsed ? '10px 0' : '10px 12px',
+                      display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+                      padding: collapsed ? '9px 0' : '9px 12px',
                       justifyContent: collapsed ? 'center' : 'flex-start',
                       border: 'none',
                       borderLeft: isActive ? '3px solid #14b8a6' : '3px solid transparent',
                       borderRadius: collapsed ? 0 : '0 8px 8px 0',
-                      cursor: 'pointer',
-                      fontSize: 14,
-                      fontWeight: isActive ? 600 : 400,
+                      cursor: 'pointer', fontSize: 13, fontWeight: isActive ? 600 : 400,
                       color: isActive ? '#5eead4' : '#94a3b8',
-                      backgroundColor: isActive
-                        ? 'rgba(20, 184, 166, 0.08)'
-                        : 'transparent',
-                      boxShadow: isActive
-                        ? 'inset 0 0 20px rgba(20, 184, 166, 0.05)'
-                        : 'none',
+                      backgroundColor: isActive ? 'rgba(20, 184, 166, 0.08)' : 'transparent',
+                      boxShadow: isActive ? 'inset 0 0 20px rgba(20, 184, 166, 0.05)' : 'none',
                       transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      fontFamily: 'inherit',
-                      marginBottom: 2,
+                      whiteSpace: 'nowrap', overflow: 'hidden', fontFamily: 'inherit', marginBottom: 1,
                     }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.backgroundColor = '#1e293b';
-                        e.currentTarget.style.color = '#e2e8f0';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = '#94a3b8';
-                      }
-                    }}
+                    onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = '#1e293b'; e.currentTarget.style.color = '#e2e8f0'; }}}
+                    onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}}
                   >
-                    <Icon size={20} style={{ flexShrink: 0 }} />
+                    <Icon size={18} style={{ flexShrink: 0 }} />
                     {!collapsed && <span>{item.label}</span>}
                   </button>
                 );
@@ -276,86 +203,19 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* ── Bottom Section: User ── */}
-      <div
-        style={{
-          borderTop: '1px solid #1e293b',
-          padding: collapsed ? '16px 0' : '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          gap: 12,
-          flexShrink: 0,
-        }}
-      >
-        {/* Avatar with online indicator */}
+      {/* User Section */}
+      <div style={{ borderTop: '1px solid #1e293b', padding: collapsed ? '16px 0' : '16px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 12, flexShrink: 0 }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <div
-            title={collapsed ? userName : undefined}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 13,
-              fontWeight: 700,
-              color: '#f0fdfa',
-              letterSpacing: '0.02em',
-            }}
-          >
+          <div title={collapsed ? userName : undefined} style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#f0fdfa', letterSpacing: '0.02em' }}>
             {initials}
           </div>
-          {/* Online dot */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              backgroundColor: '#22c55e',
-              border: '2px solid #111827',
-            }}
-          />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid #111827' }} />
         </div>
-
         {!collapsed && (
           <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#e2e8f0',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {userName}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: '#22c55e',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                marginTop: 1,
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  backgroundColor: '#22c55e',
-                  display: 'inline-block',
-                }}
-              />
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</div>
+            <div style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
               Online
             </div>
           </div>

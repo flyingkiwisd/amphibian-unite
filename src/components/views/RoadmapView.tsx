@@ -12,6 +12,7 @@ import {
   Milestone,
 } from 'lucide-react';
 import { roadmapPhases } from '@/lib/data';
+import { exportToPdf } from '@/lib/exportPdf';
 
 const aumMilestones = [
   { label: '$100M', revenue: '$1.6-2M', position: 0, isCurrent: true },
@@ -86,7 +87,7 @@ const ninetyDayGate = [
 
 export function RoadmapView() {
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div id="roadmap-view-content" className="space-y-8 animate-fade-in">
       {/* ── Header ── */}
       <div className="mb-2">
         <div className="flex items-center gap-3 mb-2">
@@ -113,7 +114,7 @@ export function RoadmapView() {
             </h2>
           </div>
           <button
-            onClick={() => console.log('Downloading Roadmap PDF...')}
+            onClick={() => exportToPdf('roadmap-view-content', 'amphibian-unite-roadmap')}
             className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent-2 hover:shadow-accent/30 active:scale-[0.97]"
           >
             <Download size={16} />

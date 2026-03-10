@@ -181,16 +181,16 @@ export const teamMembers: TeamMember[] = [
     id: 'andrew',
     name: 'Andrew Hoppin',
     role: 'Risk / Compliance / Strategy',
-    shortRole: 'Compliance',
+    shortRole: 'Strategy',
     avatar: 'AH',
     color: 'bg-emerald-500',
-    roleOneSentence: 'Owner of legal/compliance signoff and builder of governance and operational infrastructure, plus executive sponsor for advisory and quant setup.',
+    roleOneSentence: 'Owner of legal/compliance signoff, governance and operational infrastructure, SMA infrastructure for Dynamic Alpha, and the bridge between Hyla and Amphibian operating models.',
     singleThreadedOwnership: [
       'Legal/compliance signoff across entities',
       'Governance process and written agreements',
-      'Operating security posture',
-      'Advisory revenue infrastructure',
-      'AI Quant setup sponsorship'
+      'SMA infrastructure for Dynamic Alpha (Hyla Cyclical vehicle)',
+      'Post-merger operating model: which functions consolidate vs. stay independent',
+      'Product architecture oversight to make BTC Alpha institutionally diligence-ready'
     ],
     kpis: [
       'Governance agreements shipped and maintained',
@@ -750,3 +750,140 @@ export const aiLayers = [
   { layer: 5, name: 'Manager Selection', edge: '+75-125 bps', priority: 'HIGH', description: 'ML models for manager behavior prediction', status: 40 },
   { layer: 6, name: 'Operational Efficiency', edge: '+50-100 bps', priority: 'ONGOING', description: 'Automated reconciliation, compliance, reporting', status: 35 }
 ];
+
+// ── Andrew's 8-Agent Product Strategy Assessment (Mar 9, 2026) ──
+
+export interface EdgePillar {
+  name: string;
+  rating: number;
+  maxRating: number;
+  reality: string;
+}
+
+export interface ProductTarget {
+  product: string;
+  targetReturn: string;
+  maxDrawdown: string;
+  source: string;
+  honestReality: string;
+  status: 'live' | 'pre-launch' | 'concept';
+}
+
+export interface StrategicPath {
+  name: string;
+  description: string;
+  upside: string;
+  risk: string;
+  timeline: string;
+  agentRating: string;
+}
+
+export const edgeAssessment = {
+  bridgeV3Rating: 5.1,
+  andrewConsensusRating: 4,
+  targetRating: 7,
+  targetTimeline: '12 months',
+  pillars: [
+    {
+      name: 'Process (UNITE)',
+      rating: 3,
+      maxRating: 10,
+      reality: 'Framework published but not operationalized. The Integrate decision layer doesn\'t exist as executable logic. Decisions happen through judgment and discussion — not backtestable, not systematizable, not defensible in institutional DD.',
+    },
+    {
+      name: 'Data',
+      rating: 6,
+      maxRating: 10,
+      reality: 'Manager data pipeline (DDQ, live track records, on-chain exposure monitoring) is a real technical asset. The Navigate layer is where Amphibian is strongest. But data without a decision layer on top is infrastructure, not edge.',
+    },
+    {
+      name: 'Relationships',
+      rating: 5,
+      maxRating: 10,
+      reality: 'Real but depreciating. A9 JV works because of personal trust, not structural advantage. Must be converted to systematic advantage — formalized JVs, documented allocation capacity, multi-contact redundancy.',
+    },
+  ] as EdgePillar[],
+  pathTo7: [
+    'Operationalize UNITE Integrate as a documented decision framework — testable, backtestable, attributable — by Q2',
+    'Integrate Mantis-style counterparty risk monitoring into the allocation loop',
+    'Formalize A9 JV with operational transparency and kill criteria',
+    'Build regime classifier v0.1 that demonstrably improves allocation timing',
+  ],
+  threeNonNegotiables: [
+    {
+      name: 'BTC Alpha at 20 bps/month by Q3',
+      owner: 'Ty',
+      detail: '20 bps/month (~2.4% annualized) is a minimum viability test. If we can\'t deliver this with our current roster, the product thesis is broken.',
+    },
+    {
+      name: 'A9 audit clean by June',
+      owner: 'Ross / Ty',
+      detail: 'Needs specificity: internal review vs. third-party ODD (Castle Hall, Albourne). If meant to satisfy LP diligence, needs to be external. Also needs documented kill criteria.',
+    },
+    {
+      name: 'Bus factor eliminated by September',
+      owner: 'James',
+      detail: 'Needs testable definition: 3 critical LP relationships have documented secondary contacts, and 2 of 3 critical functions have a named backup who can operate independently for 30 days.',
+    },
+  ],
+};
+
+export const productTargets: ProductTarget[] = [
+  {
+    product: 'BTC Alpha',
+    targetReturn: '6-8% net annualized (BTC terms)',
+    maxDrawdown: '<5% annual',
+    source: '8-agent consensus',
+    honestReality: '2024 ~14% was inflated by FTX recovery. 2025 (-3.08%) and 2026 YTD (+0.03%) reflect the real yield environment. Ross\'s 30-50 bps/month is the correct baseline.',
+    status: 'live',
+  },
+  {
+    product: 'Dynamic Alpha',
+    targetReturn: '12-18% net annualized',
+    maxDrawdown: '<10% max drawdown',
+    source: '8-agent consensus (conservative)',
+    honestReality: 'Pre-launch. Extrapolating from A9 standalone. 20%+ in 2024-25 is exceptional but unproven at scale and through a deep bear cycle. Launch with conservative guardrails.',
+    status: 'pre-launch',
+  },
+];
+
+export const strategicPaths2030: StrategicPath[] = [
+  {
+    name: 'Proprietary Signal Generation',
+    description: 'Bandit, Seneca, regime classifier become internally-managed alpha streams. Dynamic Alpha evolves from external-manager SMA to internally-driven multi-strat.',
+    upside: 'Highest upside — own the alpha',
+    risk: 'Highest risk — backtests are not live performance. Need 12-18 months live trading.',
+    timeline: '2027-2028',
+    agentRating: 'Highest-upside, highest-risk',
+  },
+  {
+    name: 'Intelligence Platform',
+    description: 'UNITE framework + manager data pipeline + regime classification + Mantis-style risk monitoring, designed as a platform that could be licensed to other crypto funds and family offices.',
+    upside: '$5-20M ARR potential. Most defensible moat.',
+    risk: 'Requires significant engineering investment and product-market fit validation.',
+    timeline: '2027-2029',
+    agentRating: 'Most defensible moat',
+  },
+  {
+    name: 'Infrastructure-Aware Allocation',
+    description: 'Moving from "which managers" to "which protocols, which chains, which custody rails" as on-chain finance matures. Routing capital across DeFi and CeFi based on regime.',
+    upside: 'The real 2030 moat — allocation layer for tokenized capital markets',
+    risk: 'Requires on-chain ecosystem to mature significantly. 2028+ opportunity.',
+    timeline: '2028-2030',
+    agentRating: 'Best long-term, but distant',
+  },
+];
+
+export const yieldEnvironment = {
+  compressed: [
+    'Basis trades: 300-400 bps → 20-50 bps',
+    'Protocol yields (Curve, Aave): 8-12% → 1-4%',
+    'Institutional capital inflow + AI competition accelerating compression',
+  ],
+  notCompressed: [
+    'Infrastructure arbitrage — pricing discrepancies between CeFi/DeFi (persistent)',
+    'Volatility harvesting during leverage spikes (episodic, 100%+ annualized during events)',
+    'Cross-chain regime arbitrage — rotating yield opportunities across L1s/L2s',
+  ],
+  consensus: '7/8 agents agree yields are structurally compressed. Macro Strategist dissents: could reach 10-12% if regime classification adds 300-500 bps.',
+};

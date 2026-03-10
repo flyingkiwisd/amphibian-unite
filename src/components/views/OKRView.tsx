@@ -1,6 +1,7 @@
 'use client';
 
 import { okrs, kpis } from '@/lib/data';
+import { exportToPdf } from '@/lib/exportPdf';
 import {
   TrendingUp,
   TrendingDown,
@@ -54,13 +55,12 @@ const progressBarColor = (progress: number) => {
 };
 
 const handleDownloadPDF = () => {
-  console.log('[OKRView] Download KPI dashboard as PDF requested');
-  console.log('[OKRView] KPI data:', JSON.stringify(kpis, null, 2));
+  exportToPdf('okr-view-content', 'amphibian-unite-okrs-kpis');
 };
 
 export function OKRView() {
   return (
-    <div className="space-y-8">
+    <div id="okr-view-content" className="space-y-8">
       {/* ── Header ── */}
       <div className="animate-fade-in">
         <div className="flex items-center gap-3 mb-2">

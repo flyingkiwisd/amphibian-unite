@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { agents } from '@/lib/data';
 import type { Agent } from '@/lib/data';
+import { exportToPdf } from '@/lib/exportPdf';
 import {
   Compass,
   Users,
@@ -93,8 +94,7 @@ export function AgentsView() {
   const plannedCount = agents.filter((a) => a.status === 'planned').length;
 
   const handleDownloadPDF = (agent: Agent) => {
-    console.log(`[AgentsView] Download PDF requested for agent: ${agent.name} (${agent.id})`);
-    console.log(`[AgentsView] Agent data:`, JSON.stringify(agent, null, 2));
+    exportToPdf('agent-detail-panel', `amphibian-unite-agent-${agent.id}`);
   };
 
   return (
@@ -202,7 +202,7 @@ export function AgentsView() {
           />
 
           {/* Slide-in Panel */}
-          <div className="fixed top-0 right-0 h-full w-full max-w-lg bg-surface border-l border-border z-50 overflow-y-auto animate-slide-in shadow-2xl shadow-black/50">
+          <div id="agent-detail-panel" className="fixed top-0 right-0 h-full w-full max-w-lg bg-surface border-l border-border z-50 overflow-y-auto animate-slide-in shadow-2xl shadow-black/50">
             {(() => {
               const DetailIcon = iconMap[selectedAgent.icon] || Compass;
               return (
