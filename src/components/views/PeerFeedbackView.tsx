@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { MessageSquare, Star, TrendingUp, TrendingDown, Minus, Send, Check } from 'lucide-react';
+import { MessageSquare, Star, TrendingUp, TrendingDown, Minus, Send, Check, User } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 
 // ── Types ──────────────────────────────────────────────────
@@ -118,10 +118,13 @@ const generateCurrentWeek = (): WeekSubmission => {
 
 // ── Component ──────────────────────────────────────────────
 
-export function PeerFeedbackView() {
+type TrendFilter = 'all' | 'for-me' | 'by-me';
+
+export function PeerFeedbackView({ currentUser }: { currentUser?: string }) {
   const [data, setData] = useState<FeedbackData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [trendFilter, setTrendFilter] = useState<TrendFilter>('all');
 
   // Load data
   useEffect(() => {
@@ -172,6 +175,28 @@ export function PeerFeedbackView() {
       return { member, scores, latestScore, trend };
     }).sort((a, b) => b.latestScore - a.latestScore);
   }, [allWeeks]);
+
+  // Filtered member scores for the trend view
+  const filteredMemberScores = useMemo(() => {
+    if (!currentUser || trendFilter === 'all') return memberScores;
+    if (trendFilter === 'for-me') {
+      return memberScores.filter((ms) => ms.member.id === currentUser);
+    }
+    // 'by-me': show all members with the current user's submitted scores
+    // Since submissions are anonymous and scores are aggregated, show all members
+    // but highlight the current user's own row
+    return memberScores;
+  }, [memberScores, currentUser, trendFilter]);
+
+  // Sort submission members to show current user first
+  const sortedActiveMembers = useMemo(() => {
+    if (!currentUser) return activeMembers;
+    return [...activeMembers].sort((a, b) => {
+      if (a.id === currentUser) return -1;
+      if (b.id === currentUser) return 1;
+      return 0;
+    });
+  }, [currentUser]);
 
   // ── Handlers ──
 
@@ -303,14 +328,19 @@ export function PeerFeedbackView() {
         </div>
 
         <div className="space-y-3">
-          {activeMembers.map((member, idx) => {
+          {sortedActiveMembers.map((member, idx) => {
             const entry = data.currentWeek.entries.find((e) => e.memberId === member.id);
             const currentScore = entry?.score ?? 0;
+            const isYou = member.id === currentUser;
 
             return (
               <div
                 key={member.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-surface-2 border border-border animate-fade-in"
+                className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border animate-fade-in ${
+                  isYou
+                    ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                    : 'bg-surface-2 border-border'
+                }`}
                 style={{ animationDelay: `${150 + idx * 40}ms` }}
               >
                 {/* Member info */}
@@ -319,7 +349,14 @@ export function PeerFeedbackView() {
                     {member.avatar}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-text-primary">{member.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-text-primary">{member.name}</p>
+                      {isYou && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+                          You
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-text-muted">{member.shortRole}</p>
                   </div>
                 </div>
@@ -404,20 +441,66 @@ export function PeerFeedbackView() {
 
       {/* ── Trend View ── */}
       <div className="bg-surface border border-border rounded-xl p-6 animate-fade-in" style={{ animationDelay: '300ms' }}>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Collaboration Trends (Past 4 Weeks)</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-text-primary">Collaboration Trends (Past 4 Weeks)</h3>
+
+          {/* Filter toggle */}
+          {currentUser && (
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface-2 border border-border">
+              {([
+                { key: 'all' as TrendFilter, label: 'All' },
+                { key: 'for-me' as TrendFilter, label: 'For Me' },
+                { key: 'by-me' as TrendFilter, label: 'By Me' },
+              ]).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setTrendFilter(key)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    trendFilter === key
+                      ? 'bg-accent/20 text-accent border border-accent/30'
+                      : 'text-text-muted hover:text-text-primary border border-transparent'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* By Me explanation */}
+        {trendFilter === 'by-me' && currentUser && (
+          <p className="text-xs text-text-muted mb-3 flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-accent" />
+            Showing scores you submitted for each team member
+          </p>
+        )}
+
+        {/* For Me explanation */}
+        {trendFilter === 'for-me' && currentUser && (
+          <p className="text-xs text-text-muted mb-3 flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5 text-accent" />
+            Showing your collaboration trend
+          </p>
+        )}
 
         <div className="space-y-3">
-          {memberScores.map((ms, idx) => {
+          {filteredMemberScores.map((ms, idx) => {
             const TrendIcon = ms.trend === 'up' ? TrendingUp : ms.trend === 'down' ? TrendingDown : Minus;
             const trendColor = ms.trend === 'up' ? 'text-emerald-400' : ms.trend === 'down' ? 'text-rose-400' : 'text-text-muted';
             const trendLabel = ms.trend === 'up' ? 'Trending Up' : ms.trend === 'down' ? 'Trending Down' : 'Steady';
             const barWidth = ms.latestScore > 0 ? (ms.latestScore / 5) * 100 : 0;
             const barColor = ms.latestScore >= 4 ? 'bg-emerald-500' : ms.latestScore >= 3 ? 'bg-amber-500' : ms.latestScore > 0 ? 'bg-rose-500' : 'bg-surface-3';
+            const isYou = ms.member.id === currentUser;
 
             return (
               <div
                 key={ms.member.id}
-                className="flex items-center gap-3 p-3 rounded-lg bg-surface-2 border border-border hover:border-border-2 transition-all animate-fade-in"
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-all animate-fade-in ${
+                  isYou
+                    ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                    : 'bg-surface-2 border-border hover:border-border-2'
+                }`}
                 style={{ animationDelay: `${350 + idx * 40}ms` }}
               >
                 {/* Avatar */}
@@ -427,7 +510,14 @@ export function PeerFeedbackView() {
 
                 {/* Name */}
                 <div className="w-28 flex-shrink-0">
-                  <p className="text-sm font-medium text-text-primary truncate">{ms.member.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium text-text-primary truncate">{ms.member.name}</p>
+                    {isYou && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider flex-shrink-0">
+                        You
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-text-muted">{ms.member.shortRole}</p>
                 </div>
 

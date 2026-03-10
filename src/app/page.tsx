@@ -61,20 +61,20 @@ export default function Home() {
     switch (currentView) {
       case 'dashboard': return <DashboardView onNavigate={handleNavigate} currentUser={currentUser ?? 'james'} />;
       case 'agents': return <AgentsView />;
-      case 'team': return <TeamView />;
-      case 'okrs': return <OKRView />;
+      case 'team': return <TeamView currentUser={currentUser ?? 'james'} />;
+      case 'okrs': return <OKRView currentUser={currentUser ?? 'james'} />;
       case 'tasks': return <TasksView currentUser={currentUser ?? 'james'} />;
       case 'roadmap': return <RoadmapView />;
       case 'ai-edge': return <AIEdgeView />;
       case 'decisions': return <DecisionLogView />;
-      case 'notes': return <NotesView />;
-      case 'activity': return <ActivityView />;
+      case 'notes': return <NotesView currentUser={currentUser ?? 'james'} />;
+      case 'activity': return <ActivityView currentUser={currentUser ?? 'james'} />;
       case 'leaderboard': return <LeaderboardView currentUser={currentUser ?? 'james'} />;
       case 'accountability': return <AccountabilityView currentUser={currentUser ?? 'james'} />;
       case 'founder-alignment': return <FounderAlignmentView currentUser={currentUser ?? 'james'} />;
       case 'meeting-intel': return <MeetingIntelView />;
       case 'what-changed': return <WhatChangedView currentUser={currentUser ?? 'james'} />;
-      case 'peer-feedback': return <PeerFeedbackView />;
+      case 'peer-feedback': return <PeerFeedbackView currentUser={currentUser ?? 'james'} />;
       case 'cash-runway': return <CashRunwayView />;
       case 'lp-health': return <LPHealthView />;
       case 'competitive-intel': return <CompetitiveIntelView />;

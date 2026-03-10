@@ -29,6 +29,10 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [clickedUser, setClickedUser] = useState<string | null>(null);
 
   const activeMembers = teamMembers.filter((m) => m.status === 'active');
+  const hiringMembers = teamMembers.filter((m) => m.status === 'hiring');
+  const allMembers = [...activeMembers, ...hiringMembers];
+  const founderCount = 3;
+  const hoveredMember = teamMembers.find((m) => m.id === hoveredUser);
 
   const handleLogin = (userId: string) => {
     setClickedUser(userId);
@@ -266,7 +270,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         .avatar-button:hover {
           background: rgba(255, 255, 255, 0.03);
           border-color: rgba(255, 255, 255, 0.06);
-          transform: translateY(-4px);
+          transform: translateY(-4px) scale(1.1);
         }
 
         .avatar-button.clicked {
@@ -329,6 +333,122 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
         .avatar-button:hover .avatar-name {
           color: rgba(226, 232, 240, 0.8);
+        }
+
+        .avatar-short-role {
+          font-size: 9px;
+          font-weight: 500;
+          color: rgba(148, 163, 184, 0.25);
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 80px;
+          margin-top: -4px;
+          transition: all 0.3s ease;
+        }
+
+        .avatar-button:hover .avatar-short-role {
+          color: rgba(20, 184, 166, 0.6);
+        }
+
+        .status-indicator {
+          position: absolute;
+          top: 10px;
+          right: calc(50% - 30px);
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: 2px solid rgba(15, 20, 35, 0.9);
+          z-index: 5;
+        }
+
+        .status-active {
+          background: #22c55e;
+          box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+        }
+
+        .status-hiring {
+          background: #6b7280;
+          box-shadow: 0 0 6px rgba(107, 114, 128, 0.3);
+        }
+
+        .hiring-badge {
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          color: rgba(251, 191, 36, 0.9);
+          background: rgba(251, 191, 36, 0.1);
+          border: 1px solid rgba(251, 191, 36, 0.2);
+          border-radius: 4px;
+          padding: 1px 5px;
+          margin-top: -2px;
+        }
+
+        .hover-preview {
+          margin-top: -8px;
+          margin-bottom: 20px;
+          min-height: 72px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .hover-preview-card {
+          width: 100%;
+          padding: 14px 18px;
+          background: rgba(20, 184, 166, 0.04);
+          border: 1px solid rgba(20, 184, 166, 0.1);
+          border-radius: 12px;
+          animation: previewAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes previewAppear {
+          0% { opacity: 0; transform: translateY(-4px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .hover-preview-name {
+          font-size: 14px;
+          font-weight: 700;
+          color: rgba(226, 232, 240, 0.95);
+          margin-bottom: 2px;
+        }
+
+        .hover-preview-role {
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(20, 184, 166, 0.7);
+          margin-bottom: 6px;
+        }
+
+        .hover-preview-desc {
+          font-size: 11px;
+          color: rgba(148, 163, 184, 0.6);
+          line-height: 1.5;
+        }
+
+        .hover-preview-empty {
+          font-size: 11px;
+          color: rgba(148, 163, 184, 0.2);
+          font-style: italic;
+          text-align: center;
+        }
+
+        .stats-line {
+          text-align: center;
+          font-size: 11px;
+          color: rgba(148, 163, 184, 0.35);
+          margin-bottom: 28px;
+          margin-top: -8px;
+          line-height: 1.5;
+        }
+
+        .stats-line .stats-separator {
+          display: inline-block;
+          margin: 0 6px;
+          color: rgba(20, 184, 166, 0.3);
         }
 
         .avatar-role {
@@ -516,7 +636,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
         {/* Avatar grid */}
         <div className="avatar-grid">
-          {activeMembers.map((member) => {
+          {allMembers.map((member) => {
             const hex = getHexColor(member.color);
             return (
               <button
@@ -527,11 +647,13 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 onMouseLeave={() => setHoveredUser(null)}
               >
                 <div className="avatar-role">{member.shortRole}</div>
+                <div className={`status-indicator ${member.status === 'active' ? 'status-active' : 'status-hiring'}`} />
                 <div
                   className="avatar-circle"
                   style={{
                     background: `linear-gradient(135deg, ${hex}, ${hex}cc)`,
                     color: hex,
+                    opacity: member.status === 'hiring' ? 0.6 : 1,
                   }}
                 >
                   <span style={{ color: 'white' }}>{member.avatar}</span>
@@ -539,9 +661,36 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 <span className="avatar-name">
                   {member.name.split(' ')[0]}
                 </span>
+                {member.status === 'hiring' ? (
+                  <span className="hiring-badge">Hiring</span>
+                ) : (
+                  <span className="avatar-short-role">{member.shortRole}</span>
+                )}
               </button>
             );
           })}
+        </div>
+
+        {/* Hover preview card */}
+        <div className="hover-preview">
+          {hoveredMember ? (
+            <div className="hover-preview-card" key={hoveredMember.id}>
+              <div className="hover-preview-name">{hoveredMember.name}</div>
+              <div className="hover-preview-role">{hoveredMember.role}</div>
+              <div className="hover-preview-desc">{hoveredMember.roleOneSentence}</div>
+            </div>
+          ) : (
+            <div className="hover-preview-empty">Hover over a profile to see details</div>
+          )}
+        </div>
+
+        {/* Quick stats line */}
+        <div className="stats-line">
+          {teamMembers.length} team members
+          <span className="stats-separator">&middot;</span>
+          {founderCount} founders
+          <span className="stats-separator">&middot;</span>
+          Building the future of crypto fund management
         </div>
 
         {/* Footer badges */}

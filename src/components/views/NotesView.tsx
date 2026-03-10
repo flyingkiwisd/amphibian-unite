@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { memberIdToOwnerName } from '@/lib/data';
 import {
   StickyNote,
   Plus,
@@ -14,6 +15,7 @@ import {
   Cloud,
   Edit3,
   X,
+  Filter,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
@@ -23,6 +25,7 @@ interface Note {
   title: string;
   content: string;
   tags: string[];
+  author: string;
   createdAt: string;
   updatedAt: string;
   pinned: boolean;
@@ -37,6 +40,7 @@ const initialNotes: Note[] = [
     content:
       '1. Close GP capital commitment (Todd + James)\n2. BTC Alpha yield mapping completion (Ross)\n3. COO interview shortlist finalized',
     tags: ['priorities', 'weekly'],
+    author: 'James',
     createdAt: '2026-03-09T08:00:00Z',
     updatedAt: '2026-03-09T08:00:00Z',
     pinned: true,
@@ -47,6 +51,7 @@ const initialNotes: Note[] = [
     content:
       'Met with Carson Group CIO. Interested in BTC Alpha if we can show 6-month track at 20bps+. Follow up in April with updated numbers. Key concern: counterparty risk post-FTX.',
     tags: ['LP', 'sales'],
+    author: 'Todd',
     createdAt: '2026-03-07T14:30:00Z',
     updatedAt: '2026-03-07T15:10:00Z',
     pinned: false,
@@ -57,6 +62,7 @@ const initialNotes: Note[] = [
     content:
       'A9 as core (40-50%), need 3-4 additional sleeves:\n- Statistical Arbitrage (cross-exchange)\n- Volatility & Derivatives (options desks)\n- Trend-Following (Seneca-style)\n- Carry & Basis (funding rate)\n\nKey question: SMA infrastructure timeline blocking this.',
     tags: ['product', 'ai-quant'],
+    author: 'James',
     createdAt: '2026-03-05T10:00:00Z',
     updatedAt: '2026-03-06T09:45:00Z',
     pinned: false,
@@ -67,6 +73,7 @@ const initialNotes: Note[] = [
     content:
       'Must have:\n- Fund ops experience $200M+ AUM\n- Crypto/digital asset background\n- Can pass 30-day run-without-James test\n- Strong project management\n- Legal/compliance awareness\n\nNice to have: offshore entity experience, LP reporting background',
     tags: ['hiring', 'coo'],
+    author: 'James',
     createdAt: '2026-03-03T11:00:00Z',
     updatedAt: '2026-03-04T16:20:00Z',
     pinned: false,
@@ -77,6 +84,7 @@ const initialNotes: Note[] = [
     content:
       'Current: 5.1/10. Target: 7.0 by Dec 2026.\n\nPath:\n1. BTC Alpha hitting 20bps consistently (+0.5)\n2. A9 audit clean (+0.5)\n3. COO hired, 30-day test passed (+0.3)\n4. SMA infrastructure live (+0.3)\n5. Regime classifier v0.1 (+0.3)\n\nTotal: +1.9 → 7.0',
     tags: ['strategy', 'edge'],
+    author: 'Ross',
     createdAt: '2026-03-01T09:00:00Z',
     updatedAt: '2026-03-02T13:30:00Z',
     pinned: false,
@@ -122,12 +130,14 @@ const formatTime = (iso: string) => {
 
 // ── Component ──────────────────────────────────────────────
 
-export function NotesView() {
+export function NotesView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? '' : '';
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [search, setSearch] = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [showMyNotes, setShowMyNotes] = useState(false);
   const [showNewNote, setShowNewNote] = useState(false);
 
   // Editing state
@@ -156,6 +166,11 @@ export function NotesView() {
   const filteredNotes = useMemo(() => {
     let result = [...notes];
 
+    // My Notes filter
+    if (showMyNotes && ownerName) {
+      result = result.filter((n) => n.author === ownerName);
+    }
+
     // Search filter
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -179,7 +194,7 @@ export function NotesView() {
     });
 
     return result;
-  }, [notes, search, activeTagFilter]);
+  }, [notes, search, activeTagFilter, showMyNotes, ownerName]);
 
   // ── Handlers ──
 
@@ -251,6 +266,7 @@ export function NotesView() {
       title: newTitle,
       content: newContent,
       tags,
+      author: ownerName || 'Unknown',
       createdAt: now,
       updatedAt: now,
       pinned: false,
@@ -406,6 +422,42 @@ export function NotesView() {
               )}
             </div>
           </div>
+
+          {/* My Notes Filter */}
+          {ownerName && (
+            <div className="px-3 py-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-text-muted" />
+                <button
+                  onClick={() => setShowMyNotes(false)}
+                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all duration-200 ${
+                    !showMyNotes
+                      ? 'bg-accent text-white shadow-sm shadow-accent/20'
+                      : 'bg-surface-2 text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  All Notes
+                </button>
+                <button
+                  onClick={() => setShowMyNotes(true)}
+                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all duration-200 ${
+                    showMyNotes
+                      ? 'bg-accent text-white shadow-sm shadow-accent/20'
+                      : 'bg-surface-2 text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  My Notes
+                  <span
+                    className={`ml-1.5 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full text-[10px] font-bold ${
+                      showMyNotes ? 'bg-white/20 text-white' : 'bg-surface text-text-muted'
+                    }`}
+                  >
+                    {notes.filter((n) => n.author === ownerName).length}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Tag Filters */}
           <div className="px-3 py-2 border-b border-border">

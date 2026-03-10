@@ -1798,7 +1798,7 @@ function AgentIntelTab({ memberId }: { memberId: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export function TeamView() {
+export function TeamView({ currentUser }: { currentUser?: string }) {
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
@@ -1810,6 +1810,16 @@ export function TeamView() {
     }
     return map;
   }, []);
+
+  // Sort current user's card to appear first in the grid
+  const sortedMembers = useMemo(() => {
+    if (!currentUser) return teamMembers;
+    return [...teamMembers].sort((a, b) => {
+      if (a.id === currentUser) return -1;
+      if (b.id === currentUser) return 1;
+      return 0;
+    });
+  }, [currentUser]);
 
   const baseOS = selectedMember ? memberOSMap[selectedMember.id] : undefined;
 
@@ -1846,15 +1856,20 @@ export function TeamView() {
 
       {/* ── Team Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {teamMembers.map((member, index) => {
+        {sortedMembers.map((member, index) => {
           const os = memberOSMap[member.id];
           const stats = getQuickStats(os);
+          const isYou = member.id === currentUser;
 
           return (
             <button
               key={member.id}
               onClick={() => handleOpenMember(member)}
-              className="glow-card group text-left rounded-xl border border-border bg-surface p-5 transition-all duration-300 hover:border-accent/40 hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-accent/50"
+              className={`glow-card group text-left rounded-xl border p-5 transition-all duration-300 hover:border-accent/40 hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-accent/50 ${
+                isYou
+                  ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                  : 'border-border bg-surface'
+              }`}
               style={{
                 animationDelay: `${index * 50}ms`,
                 animationFillMode: 'backwards',
@@ -1874,6 +1889,11 @@ export function TeamView() {
                     <h3 className="truncate text-sm font-semibold text-text-primary">
                       {member.name}
                     </h3>
+                    {isYou && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+                        You
+                      </span>
+                    )}
                     {member.status === 'active' ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />

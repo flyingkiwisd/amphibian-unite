@@ -1,6 +1,7 @@
 'use client';
 
-import { okrs, kpis } from '@/lib/data';
+import { useState } from 'react';
+import { okrs, kpis, memberIdToOwnerName } from '@/lib/data';
 import type { OKR, KPI } from '@/lib/data';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, InlineNumber, InlineSelect, EditBanner } from '@/components/InlineEdit';
@@ -14,6 +15,7 @@ import {
   CheckCircle,
   Plus,
   Trash2,
+  Filter,
 } from 'lucide-react';
 
 const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'flat' }) => {
@@ -83,7 +85,10 @@ function makeKpiId(): string {
   return `kpi-${Date.now()}`;
 }
 
-export function OKRView() {
+export function OKRView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? '' : '';
+  const [showMyOkrs, setShowMyOkrs] = useState(false);
+
   const {
     data: okrData,
     setData: setOkrData,
@@ -99,6 +104,11 @@ export function OKRView() {
   } = useEditableStore<KPI[]>('amphibian-unite-kpis', kpis);
 
   const hasEdits = hasOkrEdits || hasKpiEdits;
+
+  // Filter OKRs: when "My OKRs" is active, show only OKRs where the user owns at least one key result
+  const displayedOkrs = showMyOkrs && ownerName
+    ? okrData.filter((okr) => okr.keyResults.some((kr) => kr.owner === ownerName))
+    : okrData;
 
   const resetAll = () => {
     resetOkrs();
@@ -295,9 +305,50 @@ export function OKRView() {
         </div>
       </div>
 
+      {/* ── OKR Filter Bar ── */}
+      {ownerName && (
+        <div className="flex items-center gap-2 animate-fade-in" style={{ animationDelay: '150ms', opacity: 0 }}>
+          <Filter className="w-4 h-4 text-text-muted mr-1" />
+          <button
+            onClick={() => setShowMyOkrs(false)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+              !showMyOkrs
+                ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                : 'bg-surface-3 text-text-muted hover:text-text-secondary hover:bg-surface-2'
+            }`}
+          >
+            All
+            <span
+              className={`inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold ${
+                !showMyOkrs ? 'bg-white/20 text-white' : 'bg-surface text-text-muted'
+              }`}
+            >
+              {okrData.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setShowMyOkrs(true)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+              showMyOkrs
+                ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                : 'bg-surface-3 text-text-muted hover:text-text-secondary hover:bg-surface-2'
+            }`}
+          >
+            My OKRs
+            <span
+              className={`inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold ${
+                showMyOkrs ? 'bg-white/20 text-white' : 'bg-surface text-text-muted'
+              }`}
+            >
+              {okrData.filter((okr) => okr.keyResults.some((kr) => kr.owner === ownerName)).length}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* ── OKR Cards ── */}
       <div className="space-y-5">
-        {okrData.map((okr, okrIndex) => (
+        {displayedOkrs.map((okr, okrIndex) => (
           <div
             key={okr.id}
             className="group/okr glow-card bg-surface rounded-xl border border-border p-6 hover:border-border-2 transition-all duration-300 animate-fade-in"
@@ -351,7 +402,11 @@ export function OKRView() {
               {okr.keyResults.map((kr, krIndex) => (
                 <div
                   key={krIndex}
-                  className="group/kr animate-fade-in"
+                  className={`group/kr animate-fade-in ${
+                    showMyOkrs && ownerName && kr.owner === ownerName
+                      ? 'border-l-2 border-l-accent bg-accent/5 rounded-lg pl-3 py-1 -ml-1'
+                      : ''
+                  }`}
                   style={{
                     animationDelay: `${350 + okrIndex * 100 + krIndex * 75}ms`,
                     opacity: 0,

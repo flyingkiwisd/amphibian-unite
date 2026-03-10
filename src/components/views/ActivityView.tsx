@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { memberIdToOwnerName } from '@/lib/data';
 import {
   Activity,
   CheckSquare,
@@ -13,6 +14,7 @@ import {
   Clock,
   Filter,
   ChevronDown,
+  UserCircle,
 } from 'lucide-react';
 
 interface Activity {
@@ -241,18 +243,26 @@ function getDateGroup(timestamp: string): string {
   return 'Earlier';
 }
 
-export function ActivityView() {
+export function ActivityView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? '' : '';
   const [filter, setFilter] = useState<FilterType>('all');
+  const [showMineOnly, setShowMineOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const filteredActivities = filter === 'all'
-    ? activities
-    : activities.filter((a) => a.type === filter);
+  const baseActivities = showMineOnly && ownerName
+    ? activities.filter((a) => a.actor === ownerName)
+    : activities;
 
-  const typeCounts: Record<string, number> = { all: activities.length };
-  for (const a of activities) {
+  const filteredActivities = filter === 'all'
+    ? baseActivities
+    : baseActivities.filter((a) => a.type === filter);
+
+  const typeCounts: Record<string, number> = { all: baseActivities.length };
+  for (const a of baseActivities) {
     typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
   }
+
+  const myActivityCount = ownerName ? activities.filter((a) => a.actor === ownerName).length : 0;
 
   // Group activities by date
   const grouped: { label: string; items: Activity[] }[] = [];
@@ -311,6 +321,30 @@ export function ActivityView() {
       {/* Filter bar */}
       <div className="mb-8 flex items-center gap-2 flex-wrap">
         <Filter className="w-4 h-4 text-text-muted mr-1" />
+        {ownerName && (
+          <button
+            onClick={() => setShowMineOnly(!showMineOnly)}
+            className={`
+              flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all
+              ${showMineOnly
+                ? 'bg-accent text-white border border-accent/40 shadow-lg shadow-accent/20'
+                : 'bg-surface text-text-muted border border-border hover:bg-surface-2 hover:text-text'
+              }
+            `}
+          >
+            <UserCircle className="w-3.5 h-3.5" />
+            My Activity
+            <span
+              className={`
+                text-xs px-1.5 py-0.5 rounded-full
+                ${showMineOnly ? 'bg-white/20 text-white' : 'bg-white/5 text-text-muted'}
+              `}
+            >
+              {myActivityCount}
+            </span>
+          </button>
+        )}
+        <div className="w-px h-5 bg-border mx-1" />
         {filterButtons.map((fb) => {
           const isActive = filter === fb.key;
           const count = typeCounts[fb.key] || 0;
@@ -362,19 +396,23 @@ export function ActivityView() {
                     const config = typeConfig[activity.type];
                     const IconComponent = config.icon;
                     const isExpanded = expandedId === activity.id;
+                    const isYours = ownerName && activity.actor === ownerName;
 
                     return (
                       <div key={activity.id} className="relative pl-10">
                         {/* Timeline dot */}
                         <div
-                          className={`absolute left-[11px] top-4 w-[9px] h-[9px] rounded-full ${config.dotColor} ring-2 ring-background z-10`}
+                          className={`absolute left-[11px] top-4 w-[9px] h-[9px] rounded-full ${isYours ? 'bg-accent ring-accent/30' : config.dotColor} ring-2 ${isYours ? 'ring-accent/30' : 'ring-background'} z-10`}
                         />
 
                         {/* Activity card */}
                         <div
                           className={`
-                            p-4 rounded-lg bg-surface border border-border
-                            hover:bg-surface-2 transition-colors cursor-pointer
+                            p-4 rounded-lg transition-colors cursor-pointer
+                            ${isYours
+                              ? 'bg-accent/5 border border-accent/20 hover:bg-accent/10'
+                              : 'bg-surface border border-border hover:bg-surface-2'
+                            }
                           `}
                           onClick={() =>
                             activity.details
@@ -389,8 +427,8 @@ export function ActivityView() {
                               </div>
                               <div className="min-w-0">
                                 <p className="text-sm">
-                                  <span className="font-semibold text-text">
-                                    {activity.actor}
+                                  <span className={`font-semibold ${isYours ? 'text-accent' : 'text-text'}`}>
+                                    {isYours ? 'You' : activity.actor}
                                   </span>{' '}
                                   <span className="text-text-muted">
                                     {activity.action}:
