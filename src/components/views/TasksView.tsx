@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { exportToPdf } from '@/lib/exportPdf';
+import { memberIdToOwnerName } from '@/lib/data';
 import {
   List,
   LayoutGrid,
@@ -33,7 +34,7 @@ interface Task {
   category: string;
 }
 
-type FilterType = 'all' | 'todo' | 'in-progress' | 'done';
+type FilterType = 'all' | 'mine' | 'todo' | 'in-progress' | 'done';
 type ViewMode = 'list' | 'kanban';
 type SortField = 'title' | 'owner' | 'priority' | 'deadline' | 'category';
 type SortDirection = 'asc' | 'desc';
@@ -240,7 +241,8 @@ function TaskModal({
 
 // ── Component ───────────────────────────────────────────────
 
-export function TasksView() {
+export function TasksView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? '' : '';
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [filter, setFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -252,13 +254,18 @@ export function TasksView() {
   // Counts
   const counts = {
     all: tasks.length,
+    mine: ownerName ? tasks.filter((t) => t.owner === ownerName).length : 0,
     todo: tasks.filter((t) => t.status === 'todo').length,
     'in-progress': tasks.filter((t) => t.status === 'in-progress').length,
     done: tasks.filter((t) => t.status === 'done').length,
   };
 
   // Filtered tasks
-  const filteredTasks = filter === 'all' ? tasks : tasks.filter((t) => t.status === filter);
+  const filteredTasks = filter === 'all'
+    ? tasks
+    : filter === 'mine'
+      ? tasks.filter((t) => t.owner === ownerName)
+      : tasks.filter((t) => t.status === filter);
 
   // Sorted tasks
   const sortedTasks = [...filteredTasks].sort((a, b) => {
@@ -335,6 +342,7 @@ export function TasksView() {
 
   const filterButtons: { key: FilterType; label: string }[] = [
     { key: 'all', label: 'All' },
+    ...(ownerName ? [{ key: 'mine' as FilterType, label: 'My Tasks' }] : []),
     { key: 'todo', label: 'Todo' },
     { key: 'in-progress', label: 'In Progress' },
     { key: 'done', label: 'Done' },

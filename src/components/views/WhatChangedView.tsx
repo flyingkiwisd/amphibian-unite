@@ -344,7 +344,7 @@ export function WhatChangedView({ currentUser = 'james' }: { currentUser?: strin
       </div>
 
       {/* ── Summary Stats ── */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="glow-card bg-surface border border-border rounded-xl p-5">
           <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Total Changes</span>
           <p className="text-2xl font-bold text-text-primary mt-2">{totalChanges}</p>

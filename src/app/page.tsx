@@ -63,13 +63,13 @@ export default function Home() {
       case 'agents': return <AgentsView />;
       case 'team': return <TeamView />;
       case 'okrs': return <OKRView />;
-      case 'tasks': return <TasksView />;
+      case 'tasks': return <TasksView currentUser={currentUser ?? 'james'} />;
       case 'roadmap': return <RoadmapView />;
       case 'ai-edge': return <AIEdgeView />;
       case 'decisions': return <DecisionLogView />;
       case 'notes': return <NotesView />;
       case 'activity': return <ActivityView />;
-      case 'leaderboard': return <LeaderboardView />;
+      case 'leaderboard': return <LeaderboardView currentUser={currentUser ?? 'james'} />;
       case 'accountability': return <AccountabilityView currentUser={currentUser ?? 'james'} />;
       case 'founder-alignment': return <FounderAlignmentView currentUser={currentUser ?? 'james'} />;
       case 'meeting-intel': return <MeetingIntelView />;

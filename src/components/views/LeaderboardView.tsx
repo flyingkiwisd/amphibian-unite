@@ -200,7 +200,7 @@ function QualityIndicator({ avg }: { avg: number }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-export function LeaderboardView() {
+export function LeaderboardView({ currentUser }: { currentUser?: string }) {
   // Build leaderboard entries
   const leaderboard = useMemo<LeaderboardEntry[]>(() => {
     const activeMembers = teamMembers.filter((m) => m.status !== 'hiring');
@@ -316,12 +316,15 @@ export function LeaderboardView() {
             const rank = idx + 1;
             const style = getRankStyle(rank);
             const barWidth = maxPoints > 0 ? (entry.total / maxPoints) * 100 : 0;
+            const isYou = entry.id === currentUser;
 
             return (
               <div
                 key={entry.id}
                 className={`glow-card rounded-xl border p-4 transition-all duration-200 hover:border-accent/30 ${
-                  rank <= 3 ? `${style.bgColor} ${style.borderColor}` : 'bg-surface border-border'
+                  isYou
+                    ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                    : rank <= 3 ? `${style.bgColor} ${style.borderColor}` : 'bg-surface border-border'
                 }`}
                 style={{ animationDelay: `${idx * 60}ms` }}
               >
@@ -342,6 +345,11 @@ export function LeaderboardView() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-text-primary truncate">{entry.name}</span>
+                      {isYou && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
+                          You
+                        </span>
+                      )}
                       {rank <= 3 && style.icon && (
                         <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${style.bgColor} ${style.textColor}`}>
                           #{rank}
