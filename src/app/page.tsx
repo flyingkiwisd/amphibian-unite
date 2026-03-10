@@ -59,7 +59,7 @@ export default function Home() {
 
   const renderView = () => {
     switch (currentView) {
-      case 'dashboard': return <DashboardView onNavigate={handleNavigate} />;
+      case 'dashboard': return <DashboardView onNavigate={handleNavigate} currentUser={currentUser ?? 'james'} />;
       case 'agents': return <AgentsView />;
       case 'team': return <TeamView />;
       case 'okrs': return <OKRView />;
@@ -70,8 +70,8 @@ export default function Home() {
       case 'notes': return <NotesView />;
       case 'activity': return <ActivityView />;
       case 'leaderboard': return <LeaderboardView />;
-      case 'accountability': return <AccountabilityView />;
-      case 'founder-alignment': return <FounderAlignmentView />;
+      case 'accountability': return <AccountabilityView currentUser={currentUser ?? 'james'} />;
+      case 'founder-alignment': return <FounderAlignmentView currentUser={currentUser ?? 'james'} />;
       case 'meeting-intel': return <MeetingIntelView />;
       case 'what-changed': return <WhatChangedView currentUser={currentUser ?? 'james'} />;
       case 'peer-feedback': return <PeerFeedbackView />;
@@ -80,7 +80,7 @@ export default function Home() {
       case 'competitive-intel': return <CompetitiveIntelView />;
       case 'knowledge-graph': return <KnowledgeGraphView />;
       case 'role-drift': return <RoleDriftView />;
-      default: return <DashboardView onNavigate={handleNavigate} />;
+      default: return <DashboardView onNavigate={handleNavigate} currentUser={currentUser ?? 'james'} />;
     }
   };
 

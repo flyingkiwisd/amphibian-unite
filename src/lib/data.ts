@@ -895,3 +895,15 @@ export const yieldEnvironment = {
   ],
   consensus: '7/8 agents agree yields are structurally compressed. Macro Strategist dissents: could reach 10-12% if regime classification adds 300-500 bps.',
 };
+
+// ── User ID ↔ Display Name Mapping ──
+
+export const memberIdToOwnerName: Record<string, string> = {
+  james: 'James', david: 'David', mark: 'Mark', todd: 'Todd',
+  paola: 'Paola', andrew: 'Andrew', ty: 'Ty', ross: 'Ross',
+  thao: 'Thao', timon: 'Timon', sahir: 'Sahir', nicole: 'Nicole', nick: 'Nick',
+};
+
+export function getMemberById(id: string): TeamMember | undefined {
+  return teamMembers.find((m) => m.id === id);
+}

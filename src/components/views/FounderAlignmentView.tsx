@@ -116,9 +116,11 @@ const generateMockData = (): WeekEntry[] => {
 
 // ── Component ──────────────────────────────────────────────
 
-export function FounderAlignmentView() {
+export function FounderAlignmentView({ currentUser }: { currentUser?: string }) {
   const [weeks, setWeeks] = useState<WeekEntry[]>([]);
-  const [selectedFounder, setSelectedFounder] = useState<FounderId | null>(null);
+  const [selectedFounder, setSelectedFounder] = useState<FounderId | null>(
+    currentUser && FOUNDERS.includes(currentUser as FounderId) ? (currentUser as FounderId) : null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [founderDropdownOpen, setFounderDropdownOpen] = useState(false);
 

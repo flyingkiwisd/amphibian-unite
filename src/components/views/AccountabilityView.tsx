@@ -151,8 +151,8 @@ const generateMockData = (): MemberData => {
 
 // ── Component ──────────────────────────────────────────────
 
-export function AccountabilityView() {
-  const [selectedMember, setSelectedMember] = useState(teamMembers[0].id);
+export function AccountabilityView({ currentUser }: { currentUser?: string }) {
+  const [selectedMember, setSelectedMember] = useState(currentUser ?? teamMembers[0].id);
   const [data, setData] = useState<MemberData>({});
   const [newCommitment, setNewCommitment] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
