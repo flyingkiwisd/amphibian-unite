@@ -347,9 +347,10 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
         <div className="overflow-x-auto pb-2 -mx-2 px-2">
           <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
             {teamMembers.map((member, index) => (
-              <div
+              <button
                 key={member.id}
-                className="glow-card bg-surface border border-border rounded-xl p-4 min-w-[140px] hover:border-border-2 transition-all duration-300 animate-fade-in"
+                onClick={() => onNavigate('team')}
+                className="glow-card bg-surface border border-border rounded-xl p-4 min-w-[140px] hover:border-border-2 transition-all duration-300 animate-fade-in cursor-pointer text-left"
                 style={{ animationDelay: `${525 + index * 40}ms` }}
               >
                 <div className="flex flex-col items-center text-center">
@@ -369,7 +370,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                     </span>
                   )}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>

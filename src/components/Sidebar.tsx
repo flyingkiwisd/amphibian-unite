@@ -16,10 +16,20 @@ import {
   Activity,
   Search,
   Trophy,
+  ClipboardCheck,
+  Handshake,
+  CalendarClock,
+  RefreshCw,
+  MessageCircle,
+  DollarSign,
+  HeartPulse,
+  Radar,
+  Network,
+  UserCheck,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 
-type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard';
+type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift';
 
 interface SidebarProps {
   currentView: string;
@@ -39,9 +49,19 @@ const navItems: { label: string; icon: React.ElementType; view: ViewType; group:
   { label: 'Decisions', icon: Scale, view: 'decisions', group: 2 },
   { label: 'Roadmap', icon: Map, view: 'roadmap', group: 2 },
   { label: 'Leaderboard', icon: Trophy, view: 'leaderboard', group: 2 },
+  { label: 'Accountability', icon: ClipboardCheck, view: 'accountability', group: 2 },
+  { label: 'Meeting Intel', icon: CalendarClock, view: 'meeting-intel', group: 2 },
   { label: 'Notes', icon: StickyNote, view: 'notes', group: 3 },
   { label: 'Activity', icon: Activity, view: 'activity', group: 3 },
   { label: 'AI Edge', icon: Cpu, view: 'ai-edge', group: 3 },
+  { label: 'What Changed', icon: RefreshCw, view: 'what-changed', group: 3 },
+  { label: 'Peer Feedback', icon: MessageCircle, view: 'peer-feedback', group: 3 },
+  { label: 'Founder Align', icon: Handshake, view: 'founder-alignment', group: 4 },
+  { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway', group: 4 },
+  { label: 'LP Health', icon: HeartPulse, view: 'lp-health', group: 4 },
+  { label: 'Competitive Intel', icon: Radar, view: 'competitive-intel', group: 4 },
+  { label: 'Knowledge Graph', icon: Network, view: 'knowledge-graph', group: 4 },
+  { label: 'Role Drift', icon: UserCheck, view: 'role-drift', group: 4 },
 ];
 
 export function Sidebar({
@@ -56,7 +76,7 @@ export function Sidebar({
   const initials = user?.avatar ?? '??';
   const userName = user?.name ?? 'Unknown';
 
-  const groups = [1, 2, 3];
+  const groups = [1, 2, 3, 4];
 
   return (
     <aside

@@ -246,6 +246,106 @@
 
 ---
 
+## 13. Decision Fatigue Reducer
+- **Agent-powered decision support** per role — not just insights but recommendations with rationale
+- Pre-digested decisions based on role, decision filter, and current priorities
+- "Based on your seat and context, here's what I recommend and why"
+- Reduces cognitive load by turning passive intelligence into active decision support
+
+---
+
+## 14. Accountability Loops
+- Morning "Top 3 Today" commitments auto-pulled into End of Day review
+- Hit rate tracking: what percentage of daily commitments were completed
+- Weekly accountability summary showing trends
+- Close-the-loop mechanism between morning intentions and evening reflection
+
+---
+
+## 15. Founder Alignment Score
+- Weekly 3-question alignment survey between founders (James, Andrew, Mark)
+- Scored and tracked over time to detect drift early
+- Prevents misalignment before it becomes a crisis
+- Visual trend showing alignment score over quarters
+
+---
+
+## 16. Meeting Intelligence
+- Pre-meeting agent generates: agenda from open blockers + priorities, pre-read from recent decisions, suggested outcomes
+- Post-meeting captures: decisions and action items automatically
+- Meetings become productive by default with AI-generated prep
+
+---
+
+## 17. "What Changed" Daily Digest
+- Morning intelligence briefing: what happened overnight
+- Fund performance updates, Slack decisions, tasks completed by others, risks that moved
+- Walk in informed instead of spending 30 minutes catching up
+- Personalized per role — each person sees what's relevant to their seat
+
+---
+
+## 18. Peer Feedback Micro-Pulses
+- Weekly 1-question peer pulse: "Rate [person]'s collaboration this week 1-5" with optional comment
+- Trends over time more valuable than one-time quarterly 360 reviews
+- Lightweight, anonymous, continuous feedback loop
+- Surfaces patterns in collaboration quality
+
+---
+
+## 19. Cash Runway & Burn Visibility
+- Financial Intelligence agent surfaces: current burn rate, runway in months, revenue vs. plan
+- Every team member sees the financial reality — transparency changes behavior
+- Break-even AUM tracking and revenue sensitivity modeling
+- Cash forecast dashboard visible to leadership
+
+---
+
+## 20. LP Health Score
+- Composite score per LP: communication frequency, satisfaction signals, AUM trend, risk of churn
+- Proactive outreach triggers when scores drop
+- LP Trust agent monitors and alerts
+- Pipeline tracking from intro → meeting → commitment
+
+---
+
+## 21. Competitive Intelligence Feed
+- Growth Agent monitors peer crypto funds: AUM changes, strategy shifts, hiring signals, product launches
+- Weekly digest: "Here's what the market is doing that you should know about"
+- Competitive positioning awareness without manual research
+
+---
+
+## 22. Knowledge Graph
+- Connect decisions → OKRs they serve → people responsible → risks they mitigate
+- Visual graph showing *why* things matter, not just *what* they are
+- Linked views across the platform
+
+---
+
+## 23. Personal Energy Tracking
+- 1-5 energy/focus rating each morning and evening in journal
+- Over weeks, patterns emerge from calendar correlation
+- Agent spots what you can't see: "You consistently rate energy low on Wednesdays — your calendar shows back-to-back meetings"
+
+---
+
+## 24. Role Drift Detection
+- Compare what someone is *supposed* to own (seat description) vs what they're *actually* doing (tasks, decisions, meetings)
+- Alert when there's significant drift
+- Prevents people doing work that isn't theirs
+
+---
+
+## 25. Editable Sections (Real-Time Collaboration)
+- **Inline editing** for Team OS sections — 360 feedback, operating system, qualities, RDS, risk framework
+- **Editable roadmap** — team members can update their own tasks and milestones
+- **Editable OKRs** — progress can be updated by owners in real-time
+- **localStorage persistence** in Crawl phase, database persistence in Walk phase
+- Each team member can update their own data without code changes
+
+---
+
 ## Roadmap: Crawl, Walk, Run
 
 ### CRAWL (Now — April 2026)
@@ -269,6 +369,11 @@
 | RDS Framework populated per person | TODO | All Team |
 | Risk Framework populated per person | TODO | All Team |
 | Quality self-assessments scored | TODO | All Team |
+| Editable Team OS sections (inline editing) | BUILDING | James / Timon |
+| Editable roadmap and OKR progress | BUILDING | James / Timon |
+| Accountability Loops (morning → EOD tracking) | BUILDING | James |
+| Personal Energy Tracking in journals | BUILDING | James |
+| Decision Fatigue Reducer (agent recommendations) | BUILDING | James |
 
 ### WALK (May — Aug 2026)
 *Integration. Connect to real data sources. Persist state.*
@@ -291,6 +396,13 @@
 | Risk heatmap across all team members | TODO | CTO |
 | Authentication with real user accounts | TODO | Timon / CTO |
 | Deploy to production (Vercel) | TODO | Timon |
+| Founder Alignment Score (weekly pulse) | TODO | James / Andrew |
+| Peer Feedback Micro-Pulses | TODO | James / Timon |
+| "What Changed" Daily Digest | TODO | CTO |
+| Meeting Intelligence (pre/post meeting AI) | TODO | CTO |
+| Cash Runway & Burn Visibility dashboard | TODO | Mark / CTO |
+| LP Health Score composite tracking | TODO | Todd / CTO |
+| Role Drift Detection alerts | TODO | CTO |
 
 ### RUN (Sep 2026+)
 *Scale. AI-native. The system thinks for you.*
@@ -311,6 +423,9 @@
 | Custom agent creation (build your own agent) | TODO | CTO |
 | Voice interface for journal entries | TODO | CTO |
 | Competitive intelligence feed (market + peer fund tracking) | TODO | Andrew / CTO |
+| Competitive Intelligence Feed | TODO | Andrew / CTO |
+| Knowledge Graph (linked decisions → OKRs → risks) | TODO | CTO |
+| Real-time collaborative editing with database | TODO | Timon / CTO |
 
 ---
 

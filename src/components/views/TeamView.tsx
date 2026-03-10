@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { exportToPdf } from '@/lib/exportPdf';
 import { teamMembers } from '@/lib/data';
 import type { TeamMember } from '@/lib/data';
@@ -30,7 +30,546 @@ import {
   ChevronRight,
   MessageSquare,
   PenTool,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Check,
 } from 'lucide-react';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useEditableData — custom hook for localStorage-backed editable overlays
+// ─────────────────────────────────────────────────────────────────────────────
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends (infer U)[]
+    ? DeepPartial<U>[] | undefined
+    : T[P] extends object
+    ? DeepPartial<T[P]>
+    : T[P];
+};
+
+function getStorageKey(memberId: string): string {
+  return `amphibian-unite-edits-${memberId}`;
+}
+
+function deepMerge<T>(base: T, overlay: DeepPartial<T> | undefined): T {
+  if (!overlay) return base;
+  if (base === null || base === undefined) return base;
+  if (typeof base !== 'object') return (overlay as T) ?? base;
+
+  if (Array.isArray(base)) {
+    const overlayArr = overlay as unknown[];
+    if (!Array.isArray(overlayArr)) return base;
+    // For arrays, use overlay length and merge element-wise
+    const result = [...base] as unknown[];
+    for (let i = 0; i < overlayArr.length; i++) {
+      if (i < result.length) {
+        if (typeof result[i] === 'object' && result[i] !== null && typeof overlayArr[i] === 'object' && overlayArr[i] !== null) {
+          result[i] = deepMerge(result[i], overlayArr[i] as DeepPartial<typeof result[number]>);
+        } else if (overlayArr[i] !== undefined) {
+          result[i] = overlayArr[i];
+        }
+      } else {
+        result.push(overlayArr[i]);
+      }
+    }
+    return result as T;
+  }
+
+  const merged = { ...base } as Record<string, unknown>;
+  for (const key of Object.keys(overlay as Record<string, unknown>)) {
+    const overlayVal = (overlay as Record<string, unknown>)[key];
+    if (overlayVal !== undefined) {
+      if (typeof merged[key] === 'object' && merged[key] !== null && typeof overlayVal === 'object' && overlayVal !== null && !Array.isArray(merged[key])) {
+        merged[key] = deepMerge(merged[key], overlayVal as DeepPartial<typeof merged[typeof key]>);
+      } else {
+        merged[key] = overlayVal;
+      }
+    }
+  }
+  return merged as T;
+}
+
+function useEditableData(memberId: string | undefined, baseOS: TeamOS | undefined) {
+  const [edits, setEdits] = useState<DeepPartial<TeamOS>>({});
+
+  // Load edits from localStorage on mount/member change
+  useEffect(() => {
+    if (!memberId) { setEdits({}); return; }
+    try {
+      const stored = localStorage.getItem(getStorageKey(memberId));
+      if (stored) setEdits(JSON.parse(stored));
+      else setEdits({});
+    } catch { setEdits({}); }
+  }, [memberId]);
+
+  // Persist edits to localStorage
+  const persistEdits = useCallback((newEdits: DeepPartial<TeamOS>) => {
+    if (!memberId) return;
+    setEdits(newEdits);
+    if (Object.keys(newEdits).length === 0) {
+      localStorage.removeItem(getStorageKey(memberId));
+    } else {
+      localStorage.setItem(getStorageKey(memberId), JSON.stringify(newEdits));
+    }
+  }, [memberId]);
+
+  // Compute merged data
+  const mergedOS = useMemo(() => {
+    if (!baseOS) return undefined;
+    return deepMerge(baseOS, edits);
+  }, [baseOS, edits]);
+
+  // Check if any edits exist for a given path
+  const hasEdits = useCallback((path: string): boolean => {
+    const parts = path.split('.');
+    let current: unknown = edits;
+    for (const part of parts) {
+      if (current === null || current === undefined || typeof current !== 'object') return false;
+      current = (current as Record<string, unknown>)[part];
+    }
+    return current !== undefined && current !== null;
+  }, [edits]);
+
+  // Set a value at a dotted path
+  const setValue = useCallback((path: string, value: unknown) => {
+    const parts = path.split('.');
+    const newEdits = JSON.parse(JSON.stringify(edits)) as Record<string, unknown>;
+    let current: Record<string, unknown> = newEdits;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!current[parts[i]] || typeof current[parts[i]] !== 'object') {
+        current[parts[i]] = {};
+      }
+      current = current[parts[i]] as Record<string, unknown>;
+    }
+    current[parts[parts.length - 1]] = value;
+    persistEdits(newEdits as DeepPartial<TeamOS>);
+  }, [edits, persistEdits]);
+
+  // Reset a section path
+  const resetSection = useCallback((path: string) => {
+    const parts = path.split('.');
+    const newEdits = JSON.parse(JSON.stringify(edits)) as Record<string, unknown>;
+    let current: Record<string, unknown> = newEdits;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!current[parts[i]] || typeof current[parts[i]] !== 'object') return;
+      current = current[parts[i]] as Record<string, unknown>;
+    }
+    delete current[parts[parts.length - 1]];
+
+    // Clean up empty parent objects
+    const cleanEmpty = (obj: Record<string, unknown>): boolean => {
+      for (const key of Object.keys(obj)) {
+        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+          if (cleanEmpty(obj[key] as Record<string, unknown>)) {
+            delete obj[key];
+          }
+        }
+      }
+      return Object.keys(obj).length === 0;
+    };
+    cleanEmpty(newEdits);
+    persistEdits(newEdits as DeepPartial<TeamOS>);
+  }, [edits, persistEdits]);
+
+  // Reset all edits
+  const resetAll = useCallback(() => {
+    persistEdits({});
+  }, [persistEdits]);
+
+  return { mergedOS, edits, hasEdits, setValue, resetSection, resetAll };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EditableText — click to edit inline text
+// ─────────────────────────────────────────────────────────────────────────────
+function EditableText({
+  value,
+  onSave,
+  isEdited,
+  onReset,
+  multiline = false,
+  className = '',
+  placeholder = 'Enter text...',
+}: {
+  value: string;
+  onSave: (newValue: string) => void;
+  isEdited?: boolean;
+  onReset?: () => void;
+  multiline?: boolean;
+  className?: string;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  const handleSave = () => {
+    if (draft.trim() !== value) onSave(draft.trim());
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    setDraft(value);
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !multiline) { e.preventDefault(); handleSave(); }
+    if (e.key === 'Enter' && multiline && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSave(); }
+    if (e.key === 'Escape') handleCancel();
+  };
+
+  if (editing) {
+    return (
+      <div className="flex-1 min-w-0">
+        {multiline ? (
+          <textarea
+            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={3}
+            placeholder={placeholder}
+            className="w-full resize-none rounded-lg border border-teal-500/50 bg-white/5 px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/30 transition-colors"
+          />
+        ) : (
+          <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="w-full rounded-lg border border-teal-500/50 bg-white/5 px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/30 transition-colors"
+          />
+        )}
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <button onClick={handleSave} className="inline-flex items-center gap-1 rounded-md bg-emerald-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-600 transition-colors">
+            <Check size={11} /> Save
+          </button>
+          <button onClick={handleCancel} className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-medium text-text-muted hover:bg-white/15 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <span className={`group/edit inline-flex items-center gap-1.5 ${className}`}>
+      <span
+        className="cursor-pointer hover:text-text-primary transition-colors"
+        onClick={() => setEditing(true)}
+      >
+        {value || <span className="italic text-text-muted">{placeholder}</span>}
+      </span>
+      <button
+        onClick={() => setEditing(true)}
+        className="opacity-0 group-hover/edit:opacity-100 transition-opacity duration-150 flex-shrink-0"
+        title="Edit"
+      >
+        <Pencil size={11} className="text-text-muted hover:text-teal-400 transition-colors" />
+      </button>
+      {isEdited && (
+        <span className="inline-flex items-center gap-1 text-[9px] font-medium text-teal-400/70 uppercase tracking-wider flex-shrink-0">
+          edited
+          {onReset && (
+            <button onClick={onReset} className="hover:text-teal-400 transition-colors" title="Reset to original">
+              <RotateCcw size={9} />
+            </button>
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EditableList — editable array of strings with add/remove
+// ─────────────────────────────────────────────────────────────────────────────
+function EditableList({
+  items,
+  onSave,
+  isEdited,
+  onReset,
+  icon: Icon,
+  iconColor,
+  sectionLabel,
+}: {
+  items: string[];
+  onSave: (newItems: string[]) => void;
+  isEdited?: boolean;
+  onReset?: () => void;
+  icon: typeof CheckCircle;
+  iconColor: string;
+  sectionLabel?: string;
+}) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
+  const [addingNew, setAddingNew] = useState(false);
+  const [newDraft, setNewDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (editingIndex !== null) inputRef.current?.focus(); }, [editingIndex]);
+  useEffect(() => { if (addingNew) addRef.current?.focus(); }, [addingNew]);
+
+  const startEdit = (index: number) => {
+    setDraft(items[index]);
+    setEditingIndex(index);
+  };
+
+  const saveEdit = () => {
+    if (editingIndex === null) return;
+    const newItems = [...items];
+    if (draft.trim()) {
+      newItems[editingIndex] = draft.trim();
+    }
+    onSave(newItems);
+    setEditingIndex(null);
+    setDraft('');
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setDraft('');
+  };
+
+  const removeItem = (index: number) => {
+    const newItems = items.filter((_, i) => i !== index);
+    onSave(newItems);
+  };
+
+  const addItem = () => {
+    if (!newDraft.trim()) return;
+    onSave([...items, newDraft.trim()]);
+    setNewDraft('');
+    setAddingNew(false);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
+    if (e.key === 'Escape') cancelEdit();
+  };
+
+  const handleAddKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+    if (e.key === 'Escape') { setAddingNew(false); setNewDraft(''); }
+  };
+
+  return (
+    <div>
+      {/* Section header row with edit indicators */}
+      {(isEdited || sectionLabel) && (
+        <div className="flex items-center gap-2 mb-1">
+          {isEdited && (
+            <span className="inline-flex items-center gap-1 text-[9px] font-medium text-teal-400/70 uppercase tracking-wider">
+              edited
+              {onReset && (
+                <button onClick={onReset} className="hover:text-teal-400 transition-colors" title="Reset to original">
+                  <RotateCcw size={9} />
+                </button>
+              )}
+            </span>
+          )}
+        </div>
+      )}
+      <ul className="space-y-2 pl-1">
+        {items.map((item, i) => (
+          <li key={i} className="group/item flex items-start gap-2.5">
+            {editingIndex === i ? (
+              <div className="flex-1 min-w-0">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  className="w-full rounded-lg border border-teal-500/50 bg-white/5 px-3 py-1.5 text-sm text-text-primary focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/30 transition-colors"
+                />
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <button onClick={saveEdit} className="inline-flex items-center gap-1 rounded-md bg-emerald-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-600 transition-colors">
+                    <Check size={11} /> Save
+                  </button>
+                  <button onClick={cancelEdit} className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-medium text-text-muted hover:bg-white/15 transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Icon size={13} className={`mt-0.5 flex-shrink-0 ${iconColor}`} />
+                <span
+                  className="text-sm leading-relaxed text-text-secondary cursor-pointer hover:text-text-primary transition-colors flex-1"
+                  onClick={() => startEdit(i)}
+                >
+                  {item}
+                </span>
+                <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity duration-150 flex-shrink-0">
+                  <button onClick={() => startEdit(i)} title="Edit" className="p-0.5 hover:text-teal-400 text-text-muted transition-colors">
+                    <Pencil size={11} />
+                  </button>
+                  <button onClick={() => removeItem(i)} title="Remove" className="p-0.5 hover:text-rose-400 text-text-muted transition-colors">
+                    <X size={11} />
+                  </button>
+                </div>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {/* Add new item */}
+      {addingNew ? (
+        <div className="mt-2 pl-1">
+          <input
+            ref={addRef}
+            type="text"
+            value={newDraft}
+            onChange={(e) => setNewDraft(e.target.value)}
+            onKeyDown={handleAddKeyDown}
+            placeholder="New item..."
+            className="w-full rounded-lg border border-teal-500/50 bg-white/5 px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400/30 transition-colors"
+          />
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <button onClick={addItem} className="inline-flex items-center gap-1 rounded-md bg-emerald-600/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-emerald-600 transition-colors">
+              <Check size={11} /> Add
+            </button>
+            <button onClick={() => { setAddingNew(false); setNewDraft(''); }} className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-medium text-text-muted hover:bg-white/15 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddingNew(true)}
+          className="mt-2 ml-1 inline-flex items-center gap-1 text-[11px] font-medium text-text-muted hover:text-teal-400 transition-colors"
+        >
+          <Plus size={12} /> Add item
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EditableScore — click score bar segments to change quality score (1-5)
+// ─────────────────────────────────────────────────────────────────────────────
+function EditableScore({
+  score,
+  onSave,
+  isEdited,
+  onReset,
+}: {
+  score: number;
+  onSave: (newScore: number) => void;
+  isEdited?: boolean;
+  onReset?: () => void;
+}) {
+  const [hoverScore, setHoverScore] = useState<number | null>(null);
+  const displayScore = hoverScore ?? score;
+
+  const getColor = (s: number) => {
+    if (s >= 4) return 'bg-emerald-500';
+    if (s >= 3) return 'bg-teal-500';
+    return 'bg-rose-500';
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex gap-0.5" onMouseLeave={() => setHoverScore(null)}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            onMouseEnter={() => setHoverScore(n)}
+            onClick={() => onSave(n)}
+            className={`h-3 w-6 rounded-sm transition-all duration-150 cursor-pointer ${
+              n <= displayScore ? getColor(displayScore) : 'bg-white/10'
+            } ${hoverScore !== null ? 'opacity-90' : ''} hover:scale-110`}
+            title={`Score: ${n}/5`}
+          />
+        ))}
+      </div>
+      <span className="text-sm font-bold text-text-primary whitespace-nowrap">{score}/5</span>
+      {isEdited && (
+        <span className="inline-flex items-center gap-1 text-[9px] font-medium text-teal-400/70 uppercase tracking-wider">
+          edited
+          {onReset && (
+            <button onClick={onReset} className="hover:text-teal-400 transition-colors" title="Reset to original">
+              <RotateCcw size={9} />
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EditableDropdown — for status/likelihood/impact fields
+// ─────────────────────────────────────────────────────────────────────────────
+function EditableDropdown<T extends string>({
+  value,
+  options,
+  onSave,
+  isEdited,
+  onReset,
+  renderBadge,
+}: {
+  value: T;
+  options: T[];
+  onSave: (newValue: T) => void;
+  isEdited?: boolean;
+  onReset?: () => void;
+  renderBadge: (val: T) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative inline-flex items-center gap-1">
+      <button onClick={() => setOpen(!open)} className="group/dd inline-flex items-center gap-1">
+        {renderBadge(value)}
+        <Pencil size={9} className="text-text-muted opacity-0 group-hover/dd:opacity-100 transition-opacity" />
+      </button>
+      {isEdited && (
+        <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-teal-400/70 uppercase tracking-wider">
+          edited
+          {onReset && (
+            <button onClick={onReset} className="hover:text-teal-400 transition-colors" title="Reset">
+              <RotateCcw size={8} />
+            </button>
+          )}
+        </span>
+      )}
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-30 rounded-lg border border-border bg-surface-2 shadow-xl py-1 min-w-[100px]">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => { onSave(opt); setOpen(false); }}
+              className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition-colors ${
+                opt === value ? 'text-teal-400 font-medium' : 'text-text-secondary'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Agent Assignment Mapping
@@ -364,54 +903,93 @@ function OverviewTab({ member, os }: { member: TeamMember; os: TeamOS }) {
   );
 }
 
-function Feedback360Tab({ os }: { os: TeamOS }) {
+function Feedback360Tab({
+  os,
+  setValue,
+  hasEdits,
+  resetSection,
+}: {
+  os: TeamOS;
+  setValue: (path: string, value: unknown) => void;
+  hasEdits: (path: string) => boolean;
+  resetSection: (path: string) => void;
+}) {
   const fb = os.feedback360;
 
   const sections: {
     title: string;
+    key: keyof typeof fb;
     items: string[];
     icon: typeof CheckCircle;
     iconColor: string;
     bgColor: string;
   }[] = [
-    { title: 'Wins for Team', items: fb.winsForTeam, icon: CheckCircle, iconColor: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
-    { title: 'Makes Harder', items: fb.makesHarder, icon: AlertTriangle, iconColor: 'text-amber-400', bgColor: 'bg-amber-500/10' },
-    { title: 'Start Doing', items: fb.startDoing, icon: ArrowRight, iconColor: 'text-blue-400', bgColor: 'bg-blue-500/10' },
-    { title: 'Stop Doing', items: fb.stopDoing, icon: X, iconColor: 'text-rose-400', bgColor: 'bg-rose-500/10' },
-    { title: 'Support Needed', items: fb.supportNeeded, icon: Users, iconColor: 'text-violet-400', bgColor: 'bg-violet-500/10' },
-    { title: 'Role Clarity', items: fb.roleClarity, icon: Briefcase, iconColor: 'text-cyan-400', bgColor: 'bg-cyan-500/10' },
-    { title: 'High Leverage Moves', items: fb.highLeverageMoves, icon: Zap, iconColor: 'text-accent', bgColor: 'bg-accent/10' },
+    { title: 'Wins for Team', key: 'winsForTeam', items: fb.winsForTeam, icon: CheckCircle, iconColor: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
+    { title: 'Makes Harder', key: 'makesHarder', items: fb.makesHarder, icon: AlertTriangle, iconColor: 'text-amber-400', bgColor: 'bg-amber-500/10' },
+    { title: 'Start Doing', key: 'startDoing', items: fb.startDoing, icon: ArrowRight, iconColor: 'text-blue-400', bgColor: 'bg-blue-500/10' },
+    { title: 'Stop Doing', key: 'stopDoing', items: fb.stopDoing, icon: X, iconColor: 'text-rose-400', bgColor: 'bg-rose-500/10' },
+    { title: 'Support Needed', key: 'supportNeeded', items: fb.supportNeeded, icon: Users, iconColor: 'text-violet-400', bgColor: 'bg-violet-500/10' },
+    { title: 'Role Clarity', key: 'roleClarity', items: fb.roleClarity, icon: Briefcase, iconColor: 'text-cyan-400', bgColor: 'bg-cyan-500/10' },
+    { title: 'High Leverage Moves', key: 'highLeverageMoves', items: fb.highLeverageMoves, icon: Zap, iconColor: 'text-accent', bgColor: 'bg-accent/10' },
   ];
 
   return (
     <div className="space-y-5">
-      {sections.map((section) => (
-        <section key={section.title}>
-          <div className="mb-3 flex items-center gap-2">
-            <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${section.bgColor}`}>
-              <section.icon size={15} className={section.iconColor} />
+      {sections.map((section) => {
+        const path = `feedback360.${section.key}`;
+        const edited = hasEdits(path);
+        return (
+          <section key={section.title}>
+            <div className="mb-3 flex items-center gap-2">
+              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${section.bgColor}`}>
+                <section.icon size={15} className={section.iconColor} />
+              </div>
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+                {section.title}
+              </h3>
+              <span className="ml-auto text-xs text-text-muted font-mono">{section.items.length}</span>
             </div>
-            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
-              {section.title}
-            </h3>
-            <span className="ml-auto text-xs text-text-muted font-mono">{section.items.length}</span>
-          </div>
-          <ul className="space-y-2 pl-1">
-            {section.items.map((item, i) => (
-              <li key={i} className="flex items-start gap-2.5">
-                <section.icon size={13} className={`mt-0.5 flex-shrink-0 ${section.iconColor}`} />
-                <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+            <EditableList
+              items={section.items}
+              onSave={(newItems) => setValue(path, newItems)}
+              isEdited={edited}
+              onReset={() => resetSection(path)}
+              icon={section.icon}
+              iconColor={section.iconColor}
+            />
+          </section>
+        );
+      })}
     </div>
   );
 }
 
-function OperatingSystemTab({ os }: { os: TeamOS }) {
+function OperatingSystemTab({
+  os,
+  setValue,
+  hasEdits,
+  resetSection,
+}: {
+  os: TeamOS;
+  setValue: (path: string, value: unknown) => void;
+  hasEdits: (path: string) => boolean;
+  resetSection: (path: string) => void;
+}) {
   const opsys = os.operatingSystem;
+
+  const listSections: {
+    title: string;
+    key: keyof typeof opsys;
+    icon: typeof CheckCircle;
+    iconColor: string;
+    bgColor: string;
+  }[] = [
+    { title: 'Morning Checklist', key: 'morningChecklist', icon: CheckCircle, iconColor: 'text-amber-400', bgColor: 'bg-amber-500/10' },
+    { title: 'Commitments', key: 'commitments', icon: CheckCircle, iconColor: 'text-accent', bgColor: 'bg-accent/10' },
+    { title: 'Decision Filter', key: 'decisionFilter', icon: ChevronRight, iconColor: 'text-blue-400', bgColor: 'bg-blue-500/10' },
+    { title: 'Evening Reflection', key: 'eveningReflection', icon: PenTool, iconColor: 'text-violet-400', bgColor: 'bg-violet-500/10' },
+    { title: 'Weekly Pulse', key: 'weeklyPulse', icon: Activity, iconColor: 'text-cyan-400', bgColor: 'bg-cyan-500/10' },
+  ];
 
   return (
     <div className="space-y-5">
@@ -422,117 +1000,89 @@ function OperatingSystemTab({ os }: { os: TeamOS }) {
             <CheckCircle size={14} className="text-emerald-400" />
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">This Seat</p>
           </div>
-          <p className="text-sm text-text-secondary leading-relaxed">{opsys.seat}</p>
+          <EditableText
+            value={opsys.seat}
+            onSave={(v) => setValue('operatingSystem.seat', v)}
+            isEdited={hasEdits('operatingSystem.seat')}
+            onReset={() => resetSection('operatingSystem.seat')}
+            multiline
+            className="text-sm text-text-secondary leading-relaxed"
+          />
         </div>
         <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4">
           <div className="flex items-center gap-2 mb-2">
             <X size={14} className="text-rose-400" />
             <p className="text-xs font-semibold uppercase tracking-wider text-rose-400">Not This Seat</p>
           </div>
-          <p className="text-sm text-text-secondary leading-relaxed">{opsys.notThisSeat}</p>
+          <EditableText
+            value={opsys.notThisSeat}
+            onSave={(v) => setValue('operatingSystem.notThisSeat', v)}
+            isEdited={hasEdits('operatingSystem.notThisSeat')}
+            onReset={() => resetSection('operatingSystem.notThisSeat')}
+            multiline
+            className="text-sm text-text-secondary leading-relaxed"
+          />
         </div>
       </div>
 
-      {/* Morning Checklist */}
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10">
-            <Clock size={15} className="text-amber-400" />
-          </div>
-          <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Morning Checklist</h3>
-        </div>
-        <ul className="space-y-2 pl-1">
-          {opsys.morningChecklist.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <CheckCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-400" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* List sections */}
+      {listSections.map((sec) => {
+        const path = `operatingSystem.${sec.key}`;
+        const items = opsys[sec.key] as string[];
+        const SIcon = sec.key === 'morningChecklist' ? Clock
+          : sec.key === 'commitments' ? Shield
+          : sec.key === 'decisionFilter' ? Brain
+          : sec.key === 'eveningReflection' ? BookOpen
+          : Activity;
 
-      {/* Commitments */}
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10">
-            <Shield size={15} className="text-accent" />
-          </div>
-          <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Commitments</h3>
-        </div>
-        <ul className="space-y-2 pl-1">
-          {opsys.commitments.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <CheckCircle size={13} className="mt-0.5 flex-shrink-0 text-accent" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Decision Filter */}
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10">
-            <Brain size={15} className="text-blue-400" />
-          </div>
-          <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Decision Filter</h3>
-        </div>
-        <ul className="space-y-2 pl-1">
-          {opsys.decisionFilter.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <ChevronRight size={13} className="mt-0.5 flex-shrink-0 text-blue-400" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Evening Reflection */}
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/10">
-            <BookOpen size={15} className="text-violet-400" />
-          </div>
-          <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Evening Reflection</h3>
-        </div>
-        <ul className="space-y-2 pl-1">
-          {opsys.eveningReflection.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <PenTool size={13} className="mt-0.5 flex-shrink-0 text-violet-400" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Weekly Pulse */}
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/10">
-            <Activity size={15} className="text-cyan-400" />
-          </div>
-          <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Weekly Pulse</h3>
-        </div>
-        <ul className="space-y-2 pl-1">
-          {opsys.weeklyPulse.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <Activity size={13} className="mt-0.5 flex-shrink-0 text-cyan-400" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+        return (
+          <section key={sec.key}>
+            <div className="mb-3 flex items-center gap-2">
+              <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${sec.bgColor}`}>
+                <SIcon size={15} className={sec.iconColor} />
+              </div>
+              <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">{sec.title}</h3>
+            </div>
+            <EditableList
+              items={items}
+              onSave={(newItems) => setValue(path, newItems)}
+              isEdited={hasEdits(path)}
+              onReset={() => resetSection(path)}
+              icon={sec.icon}
+              iconColor={sec.iconColor}
+            />
+          </section>
+        );
+      })}
 
       {/* Mantra */}
       <div className="rounded-xl border border-accent/30 bg-accent/5 p-5 text-center">
         <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-2">Mantra</p>
-        <p className="text-lg font-bold text-text-primary italic">&ldquo;{opsys.mantra}&rdquo;</p>
+        <div className="flex items-center justify-center">
+          <EditableText
+            value={opsys.mantra}
+            onSave={(v) => setValue('operatingSystem.mantra', v)}
+            isEdited={hasEdits('operatingSystem.mantra')}
+            onReset={() => resetSection('operatingSystem.mantra')}
+            className="text-lg font-bold text-text-primary italic"
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function QualitiesTab({ os }: { os: TeamOS }) {
+function QualitiesTab({
+  os,
+  setValue,
+  hasEdits,
+  resetSection,
+}: {
+  os: TeamOS;
+  setValue: (path: string, value: unknown) => void;
+  hasEdits: (path: string) => boolean;
+  resetSection: (path: string) => void;
+}) {
   const avgScore = os.qualities.length > 0
     ? (os.qualities.reduce((sum, q) => sum + q.score, 0) / os.qualities.length).toFixed(1)
     : '0';
@@ -571,6 +1121,10 @@ function QualitiesTab({ os }: { os: TeamOS }) {
       <div className="space-y-3">
         {os.qualities.map((quality, i) => {
           const isGrowthEdge = quality.score < 3;
+          const scorePath = `qualities.${i}.score`;
+          const namePath = `qualities.${i}.name`;
+          const descPath = `qualities.${i}.description`;
+
           return (
             <div
               key={i}
@@ -583,7 +1137,13 @@ function QualitiesTab({ os }: { os: TeamOS }) {
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-semibold text-text-primary">{quality.name}</h4>
+                    <EditableText
+                      value={quality.name}
+                      onSave={(v) => setValue(namePath, v)}
+                      isEdited={hasEdits(namePath)}
+                      onReset={() => resetSection(namePath)}
+                      className="text-sm font-semibold text-text-primary"
+                    />
                     {isGrowthEdge && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-400">
                         <AlertTriangle size={10} />
@@ -591,26 +1151,24 @@ function QualitiesTab({ os }: { os: TeamOS }) {
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 text-xs text-text-muted">{quality.description}</p>
-                </div>
-                <span className="text-sm font-bold text-text-primary whitespace-nowrap">{quality.score}/5</span>
-              </div>
-
-              {/* Score Bar */}
-              <div className="mb-3">
-                <div className="h-2 w-full rounded-full bg-surface-3 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${(quality.score / 5) * 100}%`,
-                      background: quality.score >= 4
-                        ? 'linear-gradient(90deg, #14b8a6, #10b981)'
-                        : quality.score >= 3
-                        ? 'linear-gradient(90deg, #14b8a6, #3b82f6)'
-                        : 'linear-gradient(90deg, #f43f5e, #ef4444)',
-                    }}
+                  <EditableText
+                    value={quality.description}
+                    onSave={(v) => setValue(descPath, v)}
+                    isEdited={hasEdits(descPath)}
+                    onReset={() => resetSection(descPath)}
+                    className="mt-0.5 text-xs text-text-muted"
                   />
                 </div>
+              </div>
+
+              {/* Score Bar — clickable */}
+              <div className="mb-3">
+                <EditableScore
+                  score={quality.score}
+                  onSave={(newScore) => setValue(scorePath, newScore)}
+                  isEdited={hasEdits(scorePath)}
+                  onReset={() => resetSection(scorePath)}
+                />
               </div>
 
               <div className="space-y-2">
@@ -631,7 +1189,17 @@ function QualitiesTab({ os }: { os: TeamOS }) {
   );
 }
 
-function RdsTab({ os }: { os: TeamOS }) {
+function RdsTab({
+  os,
+  setValue,
+  hasEdits,
+  resetSection,
+}: {
+  os: TeamOS;
+  setValue: (path: string, value: unknown) => void;
+  hasEdits: (path: string) => boolean;
+  resetSection: (path: string) => void;
+}) {
   const rds = os.rdsFramework;
   const totalItems = rds.remove.length + rds.delegate.length + rds.systematize.length;
   const completedItems =
@@ -642,6 +1210,8 @@ function RdsTab({ os }: { os: TeamOS }) {
     rds.remove.filter((r) => r.status === 'in-progress').length +
     rds.delegate.filter((d) => d.status === 'in-progress').length +
     rds.systematize.filter((s) => s.status === 'in-progress').length;
+
+  const statusOptions: ('identified' | 'in-progress' | 'done')[] = ['identified', 'in-progress', 'done'];
 
   return (
     <div className="space-y-5">
@@ -676,10 +1246,41 @@ function RdsTab({ os }: { os: TeamOS }) {
             {rds.remove.map((item, i) => (
               <div key={i} className="rounded-lg border border-border bg-surface-2 p-3">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-sm font-medium text-text-primary">{item.item}</p>
-                  <RdsStatusBadge status={item.status} />
+                  <EditableText
+                    value={item.item}
+                    onSave={(v) => {
+                      const newRemove = [...rds.remove];
+                      newRemove[i] = { ...newRemove[i], item: v };
+                      setValue('rdsFramework.remove', newRemove);
+                    }}
+                    isEdited={hasEdits(`rdsFramework.remove.${i}.item`)}
+                    onReset={() => resetSection(`rdsFramework.remove.${i}.item`)}
+                    className="text-sm font-medium text-text-primary"
+                  />
+                  <EditableDropdown
+                    value={item.status}
+                    options={statusOptions}
+                    onSave={(v) => {
+                      const newRemove = [...rds.remove];
+                      newRemove[i] = { ...newRemove[i], status: v };
+                      setValue('rdsFramework.remove', newRemove);
+                    }}
+                    isEdited={hasEdits(`rdsFramework.remove.${i}.status`)}
+                    onReset={() => resetSection(`rdsFramework.remove.${i}.status`)}
+                    renderBadge={(val) => <RdsStatusBadge status={val} />}
+                  />
                 </div>
-                <p className="text-xs text-text-muted">{item.reason}</p>
+                <EditableText
+                  value={item.reason}
+                  onSave={(v) => {
+                    const newRemove = [...rds.remove];
+                    newRemove[i] = { ...newRemove[i], reason: v };
+                    setValue('rdsFramework.remove', newRemove);
+                  }}
+                  isEdited={hasEdits(`rdsFramework.remove.${i}.reason`)}
+                  onReset={() => resetSection(`rdsFramework.remove.${i}.reason`)}
+                  className="text-xs text-text-muted"
+                />
               </div>
             ))}
             {rds.remove.length === 0 && (
@@ -699,13 +1300,44 @@ function RdsTab({ os }: { os: TeamOS }) {
             {rds.delegate.map((item, i) => (
               <div key={i} className="rounded-lg border border-border bg-surface-2 p-3">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-sm font-medium text-text-primary">{item.item}</p>
-                  <RdsStatusBadge status={item.status} />
+                  <EditableText
+                    value={item.item}
+                    onSave={(v) => {
+                      const newDelegate = [...rds.delegate];
+                      newDelegate[i] = { ...newDelegate[i], item: v };
+                      setValue('rdsFramework.delegate', newDelegate);
+                    }}
+                    isEdited={hasEdits(`rdsFramework.delegate.${i}.item`)}
+                    onReset={() => resetSection(`rdsFramework.delegate.${i}.item`)}
+                    className="text-sm font-medium text-text-primary"
+                  />
+                  <EditableDropdown
+                    value={item.status}
+                    options={statusOptions}
+                    onSave={(v) => {
+                      const newDelegate = [...rds.delegate];
+                      newDelegate[i] = { ...newDelegate[i], status: v };
+                      setValue('rdsFramework.delegate', newDelegate);
+                    }}
+                    isEdited={hasEdits(`rdsFramework.delegate.${i}.status`)}
+                    onReset={() => resetSection(`rdsFramework.delegate.${i}.status`)}
+                    renderBadge={(val) => <RdsStatusBadge status={val} />}
+                  />
                 </div>
-                <p className="text-xs text-text-muted">
-                  <ArrowRight size={10} className="inline mr-1" />
-                  {item.delegateTo}
-                </p>
+                <div className="flex items-center gap-1 text-xs text-text-muted">
+                  <ArrowRight size={10} className="inline flex-shrink-0" />
+                  <EditableText
+                    value={item.delegateTo}
+                    onSave={(v) => {
+                      const newDelegate = [...rds.delegate];
+                      newDelegate[i] = { ...newDelegate[i], delegateTo: v };
+                      setValue('rdsFramework.delegate', newDelegate);
+                    }}
+                    isEdited={hasEdits(`rdsFramework.delegate.${i}.delegateTo`)}
+                    onReset={() => resetSection(`rdsFramework.delegate.${i}.delegateTo`)}
+                    className="text-xs text-text-muted"
+                  />
+                </div>
               </div>
             ))}
             {rds.delegate.length === 0 && (
@@ -725,10 +1357,41 @@ function RdsTab({ os }: { os: TeamOS }) {
             {rds.systematize.map((item, i) => (
               <div key={i} className="rounded-lg border border-border bg-surface-2 p-3">
                 <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-sm font-medium text-text-primary">{item.item}</p>
-                  <RdsStatusBadge status={item.status} />
+                  <EditableText
+                    value={item.item}
+                    onSave={(v) => {
+                      const newSys = [...rds.systematize];
+                      newSys[i] = { ...newSys[i], item: v };
+                      setValue('rdsFramework.systematize', newSys);
+                    }}
+                    isEdited={hasEdits(`rdsFramework.systematize.${i}.item`)}
+                    onReset={() => resetSection(`rdsFramework.systematize.${i}.item`)}
+                    className="text-sm font-medium text-text-primary"
+                  />
+                  <EditableDropdown
+                    value={item.status}
+                    options={statusOptions}
+                    onSave={(v) => {
+                      const newSys = [...rds.systematize];
+                      newSys[i] = { ...newSys[i], status: v };
+                      setValue('rdsFramework.systematize', newSys);
+                    }}
+                    isEdited={hasEdits(`rdsFramework.systematize.${i}.status`)}
+                    onReset={() => resetSection(`rdsFramework.systematize.${i}.status`)}
+                    renderBadge={(val) => <RdsStatusBadge status={val} />}
+                  />
                 </div>
-                <p className="text-xs text-text-muted">{item.system}</p>
+                <EditableText
+                  value={item.system}
+                  onSave={(v) => {
+                    const newSys = [...rds.systematize];
+                    newSys[i] = { ...newSys[i], system: v };
+                    setValue('rdsFramework.systematize', newSys);
+                  }}
+                  isEdited={hasEdits(`rdsFramework.systematize.${i}.system`)}
+                  onReset={() => resetSection(`rdsFramework.systematize.${i}.system`)}
+                  className="text-xs text-text-muted"
+                />
               </div>
             ))}
             {rds.systematize.length === 0 && (
@@ -741,8 +1404,25 @@ function RdsTab({ os }: { os: TeamOS }) {
   );
 }
 
-function RiskTab({ os }: { os: TeamOS }) {
+function RiskTab({
+  os,
+  setValue,
+  hasEdits,
+  resetSection,
+}: {
+  os: TeamOS;
+  setValue: (path: string, value: unknown) => void;
+  hasEdits: (path: string) => boolean;
+  resetSection: (path: string) => void;
+}) {
   const risk = os.riskFramework;
+  const levelOptions: ('high' | 'medium' | 'low')[] = ['high', 'medium', 'low'];
+
+  const updateRisk = (index: number, field: string, value: unknown) => {
+    const newRisks = [...risk.personalRisks];
+    newRisks[index] = { ...newRisks[index], [field]: value };
+    setValue('riskFramework.personalRisks', newRisks);
+  };
 
   return (
     <div className="space-y-5">
@@ -755,7 +1435,7 @@ function RiskTab({ os }: { os: TeamOS }) {
           <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Personal Risks</h3>
         </div>
 
-        {/* Mobile: cards; Desktop: table */}
+        {/* Desktop: table */}
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -769,10 +1449,44 @@ function RiskTab({ os }: { os: TeamOS }) {
             <tbody>
               {risk.personalRisks.map((r, i) => (
                 <tr key={i} className="border-b border-border/50">
-                  <td className="py-3 pr-3 text-text-secondary">{r.risk}</td>
-                  <td className="py-3 text-center"><LikelihoodBadge level={r.likelihood} /></td>
-                  <td className="py-3 text-center"><LikelihoodBadge level={r.impact} /></td>
-                  <td className="py-3 pl-3 text-text-muted text-xs">{r.mitigation}</td>
+                  <td className="py-3 pr-3">
+                    <EditableText
+                      value={r.risk}
+                      onSave={(v) => updateRisk(i, 'risk', v)}
+                      isEdited={hasEdits(`riskFramework.personalRisks.${i}.risk`)}
+                      onReset={() => resetSection(`riskFramework.personalRisks.${i}.risk`)}
+                      className="text-text-secondary"
+                    />
+                  </td>
+                  <td className="py-3 text-center">
+                    <EditableDropdown
+                      value={r.likelihood}
+                      options={levelOptions}
+                      onSave={(v) => updateRisk(i, 'likelihood', v)}
+                      isEdited={hasEdits(`riskFramework.personalRisks.${i}.likelihood`)}
+                      onReset={() => resetSection(`riskFramework.personalRisks.${i}.likelihood`)}
+                      renderBadge={(val) => <LikelihoodBadge level={val} />}
+                    />
+                  </td>
+                  <td className="py-3 text-center">
+                    <EditableDropdown
+                      value={r.impact}
+                      options={levelOptions}
+                      onSave={(v) => updateRisk(i, 'impact', v)}
+                      isEdited={hasEdits(`riskFramework.personalRisks.${i}.impact`)}
+                      onReset={() => resetSection(`riskFramework.personalRisks.${i}.impact`)}
+                      renderBadge={(val) => <LikelihoodBadge level={val} />}
+                    />
+                  </td>
+                  <td className="py-3 pl-3">
+                    <EditableText
+                      value={r.mitigation}
+                      onSave={(v) => updateRisk(i, 'mitigation', v)}
+                      isEdited={hasEdits(`riskFramework.personalRisks.${i}.mitigation`)}
+                      onReset={() => resetSection(`riskFramework.personalRisks.${i}.mitigation`)}
+                      className="text-text-muted text-xs"
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -783,18 +1497,46 @@ function RiskTab({ os }: { os: TeamOS }) {
         <div className="sm:hidden space-y-3">
           {risk.personalRisks.map((r, i) => (
             <div key={i} className="rounded-lg border border-border bg-surface-2 p-3">
-              <p className="text-sm text-text-primary font-medium mb-2">{r.risk}</p>
+              <div className="mb-2">
+                <EditableText
+                  value={r.risk}
+                  onSave={(v) => updateRisk(i, 'risk', v)}
+                  isEdited={hasEdits(`riskFramework.personalRisks.${i}.risk`)}
+                  onReset={() => resetSection(`riskFramework.personalRisks.${i}.risk`)}
+                  className="text-sm text-text-primary font-medium"
+                />
+              </div>
               <div className="flex gap-2 mb-2">
                 <div>
                   <span className="text-[10px] text-text-muted uppercase mr-1">Likelihood:</span>
-                  <LikelihoodBadge level={r.likelihood} />
+                  <EditableDropdown
+                    value={r.likelihood}
+                    options={levelOptions}
+                    onSave={(v) => updateRisk(i, 'likelihood', v)}
+                    isEdited={hasEdits(`riskFramework.personalRisks.${i}.likelihood`)}
+                    onReset={() => resetSection(`riskFramework.personalRisks.${i}.likelihood`)}
+                    renderBadge={(val) => <LikelihoodBadge level={val} />}
+                  />
                 </div>
                 <div>
                   <span className="text-[10px] text-text-muted uppercase mr-1">Impact:</span>
-                  <LikelihoodBadge level={r.impact} />
+                  <EditableDropdown
+                    value={r.impact}
+                    options={levelOptions}
+                    onSave={(v) => updateRisk(i, 'impact', v)}
+                    isEdited={hasEdits(`riskFramework.personalRisks.${i}.impact`)}
+                    onReset={() => resetSection(`riskFramework.personalRisks.${i}.impact`)}
+                    renderBadge={(val) => <LikelihoodBadge level={val} />}
+                  />
                 </div>
               </div>
-              <p className="text-xs text-text-muted">{r.mitigation}</p>
+              <EditableText
+                value={r.mitigation}
+                onSave={(v) => updateRisk(i, 'mitigation', v)}
+                isEdited={hasEdits(`riskFramework.personalRisks.${i}.mitigation`)}
+                onReset={() => resetSection(`riskFramework.personalRisks.${i}.mitigation`)}
+                className="text-xs text-text-muted"
+              />
             </div>
           ))}
         </div>
@@ -808,14 +1550,14 @@ function RiskTab({ os }: { os: TeamOS }) {
           </div>
           <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Decision Principles</h3>
         </div>
-        <ul className="space-y-2 pl-1">
-          {risk.decisionPrinciples.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <ChevronRight size={13} className="mt-0.5 flex-shrink-0 text-blue-400" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
+        <EditableList
+          items={risk.decisionPrinciples}
+          onSave={(newItems) => setValue('riskFramework.decisionPrinciples', newItems)}
+          isEdited={hasEdits('riskFramework.decisionPrinciples')}
+          onReset={() => resetSection('riskFramework.decisionPrinciples')}
+          icon={ChevronRight}
+          iconColor="text-blue-400"
+        />
       </section>
 
       {/* Red Lines */}
@@ -826,14 +1568,14 @@ function RiskTab({ os }: { os: TeamOS }) {
           </div>
           <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Red Lines</h3>
         </div>
-        <div className="space-y-2">
-          {risk.redLines.map((line, i) => (
-            <div key={i} className="flex items-start gap-2.5 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3">
-              <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-rose-400" />
-              <span className="text-sm leading-relaxed text-rose-300">{line}</span>
-            </div>
-          ))}
-        </div>
+        <EditableList
+          items={risk.redLines}
+          onSave={(newItems) => setValue('riskFramework.redLines', newItems)}
+          isEdited={hasEdits('riskFramework.redLines')}
+          onReset={() => resetSection('riskFramework.redLines')}
+          icon={AlertCircle}
+          iconColor="text-rose-400"
+        />
       </section>
     </div>
   );
@@ -1060,7 +1802,7 @@ export function TeamView() {
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
-  // Pre-compute OS data for quick stats on cards
+  // Pre-compute base OS data for quick stats on cards
   const memberOSMap = useMemo(() => {
     const map: Record<string, TeamOS | undefined> = {};
     for (const m of teamMembers) {
@@ -1069,7 +1811,16 @@ export function TeamView() {
     return map;
   }, []);
 
-  const selectedOS = selectedMember ? memberOSMap[selectedMember.id] : undefined;
+  const baseOS = selectedMember ? memberOSMap[selectedMember.id] : undefined;
+
+  // Editable data hook — overlays localStorage edits on base OS data
+  const { mergedOS, edits, hasEdits, setValue, resetSection, resetAll } = useEditableData(
+    selectedMember?.id,
+    baseOS
+  );
+
+  const selectedOS = mergedOS;
+  const hasAnyEdits = Object.keys(edits).length > 0;
 
   const handleOpenMember = (member: TeamMember) => {
     setSelectedMember(member);
@@ -1265,14 +2016,30 @@ export function TeamView() {
 
             {/* ── Tab Content ── */}
             <div className="p-6">
+              {/* Reset all edits banner */}
+              {selectedOS && hasAnyEdits && (
+                <div className="mb-4 flex items-center justify-between rounded-lg border border-teal-500/20 bg-teal-500/5 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Pencil size={13} className="text-teal-400" />
+                    <span className="text-xs font-medium text-teal-400">This member has custom edits saved locally</span>
+                  </div>
+                  <button
+                    onClick={resetAll}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-[11px] font-medium text-text-muted hover:bg-white/15 hover:text-text-primary transition-colors"
+                  >
+                    <RotateCcw size={11} />
+                    Reset All to Original
+                  </button>
+                </div>
+              )}
               {selectedOS ? (
                 <>
                   {activeTab === 'overview' && <OverviewTab member={selectedMember} os={selectedOS} />}
-                  {activeTab === '360' && <Feedback360Tab os={selectedOS} />}
-                  {activeTab === 'os' && <OperatingSystemTab os={selectedOS} />}
-                  {activeTab === 'qualities' && <QualitiesTab os={selectedOS} />}
-                  {activeTab === 'rds' && <RdsTab os={selectedOS} />}
-                  {activeTab === 'risk' && <RiskTab os={selectedOS} />}
+                  {activeTab === '360' && <Feedback360Tab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'os' && <OperatingSystemTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'qualities' && <QualitiesTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'rds' && <RdsTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'risk' && <RiskTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
                   {activeTab === 'journal' && <JournalTab memberId={selectedMember.id} />}
                   {activeTab === 'agent-intel' && <AgentIntelTab memberId={selectedMember.id} />}
                 </>

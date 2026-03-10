@@ -14,10 +14,20 @@ import { DecisionLogView } from '@/components/views/DecisionLogView';
 import { NotesView } from '@/components/views/NotesView';
 import { ActivityView } from '@/components/views/ActivityView';
 import { LeaderboardView } from '@/components/views/LeaderboardView';
+import { AccountabilityView } from '@/components/views/AccountabilityView';
+import { FounderAlignmentView } from '@/components/views/FounderAlignmentView';
+import { MeetingIntelView } from '@/components/views/MeetingIntelView';
+import { WhatChangedView } from '@/components/views/WhatChangedView';
+import { PeerFeedbackView } from '@/components/views/PeerFeedbackView';
+import { CashRunwayView } from '@/components/views/CashRunwayView';
+import { LPHealthView } from '@/components/views/LPHealthView';
+import { CompetitiveIntelView } from '@/components/views/CompetitiveIntelView';
+import { KnowledgeGraphView } from '@/components/views/KnowledgeGraphView';
+import { RoleDriftView } from '@/components/views/RoleDriftView';
 import { LoginScreen } from '@/components/LoginScreen';
 import { CommandPalette } from '@/components/CommandPalette';
 
-export type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard';
+export type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift';
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -60,6 +70,16 @@ export default function Home() {
       case 'notes': return <NotesView />;
       case 'activity': return <ActivityView />;
       case 'leaderboard': return <LeaderboardView />;
+      case 'accountability': return <AccountabilityView />;
+      case 'founder-alignment': return <FounderAlignmentView />;
+      case 'meeting-intel': return <MeetingIntelView />;
+      case 'what-changed': return <WhatChangedView currentUser={currentUser ?? 'james'} />;
+      case 'peer-feedback': return <PeerFeedbackView />;
+      case 'cash-runway': return <CashRunwayView />;
+      case 'lp-health': return <LPHealthView />;
+      case 'competitive-intel': return <CompetitiveIntelView />;
+      case 'knowledge-graph': return <KnowledgeGraphView />;
+      case 'role-drift': return <RoleDriftView />;
       default: return <DashboardView onNavigate={handleNavigate} />;
     }
   };

@@ -51,13 +51,14 @@ export const teamMembers: TeamMember[] = [
     shortRole: 'CEO',
     avatar: 'JH',
     color: 'bg-teal-500',
-    roleOneSentence: 'CEO and architect of Amphibian\'s strategic edge, institutional maturity, and leadership bench building the company to scale beyond any single person.',
+    roleOneSentence: 'CEO and architect of Amphibian\'s strategic edge, institutional maturity, platform/OS vision, and leadership bench building the company to scale beyond any single person.',
     singleThreadedOwnership: [
       'Company vision, strategic direction, and North Star ($1B AUM by 2030)',
       'Leadership design, hiring of senior operators, and succession architecture',
       '"Edge" definition and enforcement across all products',
       'Culture standards and founder alignment',
-      'Institutional readiness: building the org so it runs with excellence regardless of who is in any seat'
+      'Institutional readiness: building the org so it runs with excellence regardless of who is in any seat',
+      'Amphibian Unite internal OS development and rollout'
     ],
     kpis: [
       'AUM growth trajectory toward $1B',
@@ -180,17 +181,18 @@ export const teamMembers: TeamMember[] = [
   {
     id: 'andrew',
     name: 'Andrew Hoppin',
-    role: 'Risk / Compliance / Strategy',
+    role: 'Strategy & Dynamic Alpha',
     shortRole: 'Strategy',
     avatar: 'AH',
     color: 'bg-emerald-500',
-    roleOneSentence: 'Owner of legal/compliance signoff, governance and operational infrastructure, SMA infrastructure for Dynamic Alpha, and the bridge between Hyla and Amphibian operating models.',
+    roleOneSentence: 'Business Owner for Dynamic Alpha / AI Quant — market validation, budget management, build vs buy decisions, IP strategy, compliance, governance, and SMA infrastructure.',
     singleThreadedOwnership: [
       'Legal/compliance signoff across entities',
       'Governance process and written agreements',
       'SMA infrastructure for Dynamic Alpha (Hyla Cyclical vehicle)',
       'Post-merger operating model: which functions consolidate vs. stay independent',
-      'Product architecture oversight to make BTC Alpha institutionally diligence-ready'
+      'Product architecture oversight to make BTC Alpha institutionally diligence-ready',
+      'Dynamic Alpha / AI Quant business ownership — market validation, budget, IP strategy'
     ],
     kpis: [
       'Governance agreements shipped and maintained',
@@ -214,13 +216,14 @@ export const teamMembers: TeamMember[] = [
     shortRole: 'CIO',
     avatar: 'TY',
     color: 'bg-violet-500',
-    roleOneSentence: 'CIO accountable for core-fund outcomes and risk posture, with decision finality inside guardrails, and accountable for shipping an auditable risk/allocation engine.',
+    roleOneSentence: 'CIO & BTC Alpha Product Lead accountable for core-fund outcomes, risk posture, Bitcoin yield strategies, DeFi integration, and options structures.',
     singleThreadedOwnership: [
       'Portfolio outcomes + risk posture for core funds',
       'Risk governance system: limits, sizing rules, hedging policy',
       'Manager lifecycle: selection, onboarding, monitoring, and exit',
       'Risk/Allocation engine roadmap',
-      'Evaluate novel trading & investment strategies'
+      'Evaluate novel trading & investment strategies',
+      'BTC Alpha product ownership — yield strategies, DeFi integration, options structures'
     ],
     kpis: [
       'Risk limits: defined, published with 100% breaches logged',
@@ -243,10 +246,11 @@ export const teamMembers: TeamMember[] = [
     shortRole: 'PM',
     avatar: 'RS',
     color: 'bg-cyan-500',
-    roleOneSentence: 'Portfolio Manager across the FoF, responsible for day-to-day portfolio execution and turning the process into a repeatable practice.',
+    roleOneSentence: 'PM & SMA Infrastructure Lead across the FoF, responsible for day-to-day portfolio execution, SMA setup, counterparty management, and turning the process into a repeatable practice.',
     singleThreadedOwnership: [
       'PM execution quality across the FoF',
-      'Implementation of portfolio process and decision discipline'
+      'Implementation of portfolio process and decision discipline',
+      'SMA infrastructure setup — exchange accounts, custody providers, counterparty onboarding'
     ],
     kpis: [
       'Portfolio changes documented consistently',
@@ -292,16 +296,18 @@ export const teamMembers: TeamMember[] = [
   {
     id: 'timon',
     name: 'Timon',
-    role: 'Product Engineer',
+    role: 'Engineer & Platform Lead',
     shortRole: 'Engineer',
     avatar: 'TI',
     color: 'bg-sky-500',
-    roleOneSentence: 'Product engineer building risk dashboard, data pipeline, and platform infrastructure.',
+    roleOneSentence: 'Engineer & Platform Lead building risk dashboard, data pipeline, DeFi automation, regime classifier, and internal tools — managing AI agents instead of hiring junior engineers.',
     singleThreadedOwnership: [
       'Risk dashboard development',
       'Data pipeline architecture',
       'Platform infrastructure',
-      'Regime classifier implementation'
+      'Regime classifier implementation',
+      'DeFi monitoring and automation tooling',
+      'Internal platform (Amphibian Unite) development'
     ],
     kpis: [
       'Risk dashboard v1 shipped',
@@ -317,15 +323,17 @@ export const teamMembers: TeamMember[] = [
   {
     id: 'sahir',
     name: 'Sahir',
-    role: 'Product Operations',
+    role: 'Prod Ops & Strategy',
     shortRole: 'Prod Ops',
     avatar: 'SA',
     color: 'bg-lime-500',
-    roleOneSentence: 'Product operations specialist driving manager research, performance analytics, and operational support.',
+    roleOneSentence: 'Prod Ops & Strategy specialist driving SMA manager selection, options modeling, manager research, and serving as strategic sounding board for CIO.',
     singleThreadedOwnership: [
       'Manager research and performance analytics',
       'Strategy performance database',
-      'Operational support across products'
+      'Operational support across products',
+      'SMA manager selection and strategy design',
+      'Options strategy modeling support'
     ],
     kpis: [
       'Strategy performance database built',

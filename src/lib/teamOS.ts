@@ -118,7 +118,7 @@ export const jamesOS: TeamOS = {
   },
 
   operatingSystem: {
-    seat: 'CEO — Direction, governance, runway, culture',
+    seat: 'CEO — Vision, strategy, culture, roadmap, platform/OS vision',
     notThisSeat: 'Portfolio construction, IC work, execution details',
     morningChecklist: [
       'Am I regulated? Am I at earth pace?',
@@ -133,6 +133,8 @@ export const jamesOS: TeamOS = {
       'Hard calls early, delivered with love',
       'Decisions in the room, not in side channels',
       'Proof over narrative — show, do not tell',
+      'Build vs buy framework — evaluate short, medium, and long-term consequences for every major tool decision',
+      'Own IP where possible — prioritize building when it creates defensible advantage',
     ],
     decisionFilter: [
       'Is this about clarity or urgency?',
@@ -484,7 +486,7 @@ export const tyOS: TeamOS = {
   },
 
   operatingSystem: {
-    seat: 'CIO — Portfolio outcomes, risk governance, allocation engine',
+    seat: 'CIO & BTC Alpha Product Lead — Portfolio outcomes, risk governance, Bitcoin yield strategies, DeFi integration',
     notThisSeat: 'LP communications, firm operations, sales and business development',
     morningChecklist: [
       'Market pulse — any overnight moves requiring attention?',
@@ -497,6 +499,7 @@ export const tyOS: TeamOS = {
       'Decision finality — once the call is made, stand behind it',
       'Communicate the why proactively — do not make the team ask',
       'Hold the CEO/CIO boundary — with respect but without compromise',
+      'Lead BTC Alpha product — own the yield strategy, DeFi integration, and options structures end to end',
     ],
     decisionFilter: [
       'What does the data say? What does it not say?',
@@ -653,7 +656,7 @@ export const rossOS: TeamOS = {
   },
 
   operatingSystem: {
-    seat: 'PM — Execution quality, portfolio process, manager monitoring',
+    seat: 'PM & SMA Infrastructure — Portfolio execution, manager monitoring, SMA setup, counterparty management',
     notThisSeat: 'Portfolio allocation decisions, LP communications, business development',
     morningChecklist: [
       'Any portfolio changes from yesterday that need documentation?',
@@ -666,6 +669,7 @@ export const rossOS: TeamOS = {
       'Signal capacity honestly — red, yellow, or green',
       'Consistent monitoring process across all managers — no exceptions',
       'Process discipline over heroics — reliability beats intensity',
+      'Lead SMA infrastructure — exchange accounts, custody, counterparty onboarding',
     ],
     decisionFilter: [
       'Is this my owned responsibility or unowned work I am absorbing?',
@@ -822,7 +826,7 @@ export const andrewOS: TeamOS = {
   },
 
   operatingSystem: {
-    seat: 'Strategy — Compliance, governance infrastructure, SMA setup',
+    seat: 'Strategy & Dynamic Alpha Business Owner — Compliance, governance, SMA setup, product viability, build vs buy',
     notThisSeat: 'Portfolio decisions, LP relationship management, daily operations execution',
     morningChecklist: [
       'Any compliance deadlines approaching this week?',
@@ -835,6 +839,7 @@ export const andrewOS: TeamOS = {
       'Compliance is not optional — track it, own it, close it',
       'Make complex structures accessible — if the team does not understand it, it is not done',
       'Protect the firm through infrastructure, not just intentions',
+      'Own Dynamic Alpha business case — market validation, budget, build vs buy, IP strategy',
     ],
     decisionFilter: [
       'Does this protect the firm structurally or just feel productive?',
@@ -1498,7 +1503,7 @@ export const timonOS: TeamOS = {
   },
 
   operatingSystem: {
-    seat: 'Engineer — Risk dashboard, data pipeline, regime classifier',
+    seat: 'Engineer & Platform Lead — Risk dashboard, data pipeline, regime classifier, DeFi automation, internal tools',
     notThisSeat: 'Portfolio decisions, LP communications, operations execution',
     morningChecklist: [
       'Data pipeline health — any failures or anomalies overnight?',
@@ -1836,7 +1841,7 @@ export const sahirOS: TeamOS = {
   },
 
   operatingSystem: {
-    seat: 'Prod Ops — Manager research, performance analytics, operational data support',
+    seat: 'Prod Ops & Strategy — Manager research, SMA manager selection, options modeling, strategic sounding board',
     notThisSeat: 'Portfolio allocation decisions, LP communications, firm strategy',
     morningChecklist: [
       'Any research deliverables due today or this week?',

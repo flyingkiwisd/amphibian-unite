@@ -14,10 +14,20 @@ import {
   StickyNote,
   Activity,
   Trophy,
+  ClipboardCheck,
+  Handshake,
+  CalendarClock,
+  RefreshCw,
+  MessageCircle,
+  DollarSign,
+  HeartPulse,
+  Radar,
+  Network,
+  UserCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 
-type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard';
+type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift';
 
 interface MobileNavProps {
   currentView: string;
@@ -40,6 +50,16 @@ const moreTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
   { label: 'Notes', icon: StickyNote, view: 'notes' },
   { label: 'Activity', icon: Activity, view: 'activity' },
   { label: 'AI Edge', icon: Cpu, view: 'ai-edge' },
+  { label: 'Accountability', icon: ClipboardCheck, view: 'accountability' },
+  { label: 'Meeting Intel', icon: CalendarClock, view: 'meeting-intel' },
+  { label: 'What Changed', icon: RefreshCw, view: 'what-changed' },
+  { label: 'Peer Feedback', icon: MessageCircle, view: 'peer-feedback' },
+  { label: 'Founder Align', icon: Handshake, view: 'founder-alignment' },
+  { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway' },
+  { label: 'LP Health', icon: HeartPulse, view: 'lp-health' },
+  { label: 'Competitive Intel', icon: Radar, view: 'competitive-intel' },
+  { label: 'Knowledge Graph', icon: Network, view: 'knowledge-graph' },
+  { label: 'Role Drift', icon: UserCheck, view: 'role-drift' },
 ];
 
 export function MobileNav({ currentView, onViewChange, onOpenSearch }: MobileNavProps) {
