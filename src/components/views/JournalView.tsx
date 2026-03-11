@@ -5,7 +5,8 @@ import {
   Sun, Moon, CalendarDays, TrendingUp, ChevronDown, ChevronRight,
   Check, Circle, Sparkles, BookOpen, Target, AlertTriangle, Heart,
   RotateCcw, Flame, Brain, Trophy, Send, Lock, MessageCircle,
-  Lightbulb, TrendingDown, Zap, Award,
+  Lightbulb, TrendingDown, Zap, Award, Bookmark, Copy, ClipboardCheck,
+  X, BarChart3,
 } from 'lucide-react';
 import { memberIdToOwnerName } from '@/lib/data';
 import { getTeamMemberOS } from '@/lib/teamOS';
@@ -335,6 +336,9 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
   const [aiTimeRange, setAiTimeRange] = useState<7 | 14 | 30>(7);
+  const [showPublishedLibrary, setShowPublishedLibrary] = useState(false);
+  const [expandedPublished, setExpandedPublished] = useState<Set<string>>(new Set());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Find today's entry for the active tab
   const todayEntry = useMemo(
@@ -406,6 +410,70 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
 
     return { themes, feedback, entryCount: recentEntries.length };
   }, [journal.entries, aiTimeRange]);
+
+  // Published entries sorted by publish date (newest first)
+  const publishedEntries = useMemo(
+    () =>
+      journal.entries
+        .filter((e) => !!e.publishedAt)
+        .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '')),
+    [journal.entries]
+  );
+
+  // Published entry stats
+  const publishedStats = useMemo(() => {
+    const total = publishedEntries.length;
+    if (total === 0) return { total: 0, streak: 0, mostCommonType: null as EntryType | null, avgMood: 0 };
+
+    // Publishing streak: consecutive days with at least one published entry
+    const publishDates = Array.from(
+      new Set(publishedEntries.map((e) => e.date))
+    ).sort((a, b) => b.localeCompare(a)); // newest first
+
+    let streak = 0;
+    const todayDate = todayISO();
+    let checkDate = new Date(todayDate + 'T12:00:00');
+
+    for (const dateStr of publishDates) {
+      const checkISO = checkDate.toISOString().split('T')[0];
+      if (dateStr === checkISO) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else if (dateStr < checkISO) {
+        // If the first published date is yesterday (not today), still check for streak starting yesterday
+        if (streak === 0) {
+          const yesterday = new Date(todayDate + 'T12:00:00');
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayISO = yesterday.toISOString().split('T')[0];
+          if (dateStr === yesterdayISO) {
+            streak = 1;
+            checkDate = new Date(yesterday);
+            checkDate.setDate(checkDate.getDate() - 1);
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Most common entry type
+    const typeCounts: Record<string, number> = {};
+    for (const e of publishedEntries) {
+      typeCounts[e.type] = (typeCounts[e.type] ?? 0) + 1;
+    }
+    const mostCommonType = (Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null) as EntryType | null;
+
+    // Average mood
+    const moodOrder: Record<string, number> = { great: 5, good: 4, neutral: 3, tough: 2, rough: 1 };
+    const moodEntries = publishedEntries.filter((e) => e.mood);
+    const avgMood = moodEntries.length > 0
+      ? moodEntries.reduce((sum, e) => sum + (moodOrder[e.mood!] ?? 3), 0) / moodEntries.length
+      : 0;
+
+    return { total, streak, mostCommonType, avgMood };
+  }, [publishedEntries]);
 
   // Create or update today's entry
   function createTodayEntry(): JournalEntry {
@@ -511,12 +579,131 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
     }));
   }
 
+  function unpublishEntry(entryId: string) {
+    updateEntry(entryId, (e) => ({
+      ...e,
+      publishedAt: undefined,
+    }));
+  }
+
   function toggleExpanded(id: string) {
     setExpandedEntries((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
+    });
+  }
+
+  function toggleExpandedPublished(id: string) {
+    setExpandedPublished((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function formatEntryForClipboard(entry: JournalEntry): string {
+    const typeLabel = entry.type === 'morning' ? 'Morning Check-In' : entry.type === 'eod' ? 'End of Day Reflection' : entry.type === 'evening' ? 'Evening Check-In' : 'Weekly Pulse';
+    const lines: string[] = [];
+
+    lines.push(`=== ${typeLabel} ===`);
+    lines.push(`Date: ${formatDate(entry.date)}`);
+    if (entry.publishedAt) lines.push(`Published: ${new Date(entry.publishedAt).toLocaleString()}`);
+    lines.push('');
+
+    if (entry.mood) {
+      const mc = moodConfig[entry.mood];
+      lines.push(`Mood: ${mc.emoji} ${mc.label}`);
+    }
+    if (entry.energy) lines.push(`Energy: ${entry.energy}/5 (${energyLabels[entry.energy]})`);
+    if (entry.mood || entry.energy) lines.push('');
+
+    if ((entry.winOfTheDay ?? '').trim()) {
+      lines.push('Win of the Day:');
+      lines.push(entry.winOfTheDay);
+      lines.push('');
+    }
+
+    if (entry.checklist.length > 0) {
+      const completed = entry.checklist.filter((c) => c.checked).length;
+      lines.push(`Checklist (${completed}/${entry.checklist.length}):`);
+      for (const item of entry.checklist) {
+        lines.push(`  ${item.checked ? '[x]' : '[ ]'} ${item.text}`);
+      }
+      lines.push('');
+    }
+
+    if (entry.reflections.filter(Boolean).length > 0) {
+      lines.push('Reflections:');
+      for (const r of entry.reflections.filter(Boolean)) {
+        lines.push(`  - ${r}`);
+      }
+      lines.push('');
+    }
+
+    if (entry.wins.filter(Boolean).length > 0) {
+      lines.push('Wins:');
+      for (const w of entry.wins.filter(Boolean)) {
+        lines.push(`  - ${w}`);
+      }
+      lines.push('');
+    }
+
+    if ((entry.gratitude ?? '').trim()) {
+      lines.push(`Gratitude: ${entry.gratitude}`);
+      lines.push('');
+    }
+
+    if ((entry.notes ?? '').trim()) {
+      lines.push('Notes:');
+      lines.push(entry.notes);
+      lines.push('');
+    }
+
+    if ((entry.dailyPromptResponse ?? '').trim()) {
+      lines.push('Daily Prompt Response:');
+      lines.push(entry.dailyPromptResponse);
+      lines.push('');
+    }
+
+    // Evening-specific fields
+    if (entry.type === 'evening') {
+      if ((entry.eveningWentWell ?? '').trim()) {
+        lines.push('What Went Well:');
+        lines.push(entry.eveningWentWell!);
+        lines.push('');
+      }
+      if ((entry.eveningCouldImprove ?? '').trim()) {
+        lines.push('Could Have Gone Better:');
+        lines.push(entry.eveningCouldImprove!);
+        lines.push('');
+      }
+      if ((entry.eveningGratitude ?? '').trim()) {
+        lines.push('Evening Gratitude:');
+        lines.push(entry.eveningGratitude!);
+        lines.push('');
+      }
+      if ((entry.eveningTomorrowPriority ?? '').trim()) {
+        lines.push(`Tomorrow's #1 Priority: ${entry.eveningTomorrowPriority}`);
+      }
+      if (entry.eveningTomorrowEnergy) {
+        lines.push(`Energy for Tomorrow: ${entry.eveningTomorrowEnergy}/5`);
+      }
+      if ((entry.eveningSleepIntention ?? '').trim()) {
+        lines.push(`Sleep Intention: ${entry.eveningSleepIntention}`);
+      }
+    }
+
+    return lines.join('\n').trim();
+  }
+
+  function copyEntryToClipboard(entry: JournalEntry) {
+    const text = formatEntryForClipboard(entry);
+    navigator.clipboard.writeText(text).then(() => {
+      setToastMessage('Entry copied to clipboard');
+      setTimeout(() => setToastMessage(null), 2500);
     });
   }
 
@@ -1209,6 +1396,290 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
         </div>
       </div>
 
+      {/* ============================================================= */}
+      {/* PUBLISHED LIBRARY */}
+      {/* ============================================================= */}
+      {publishedEntries.length > 0 && (
+        <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 overflow-hidden">
+          <button
+            onClick={() => setShowPublishedLibrary(!showPublishedLibrary)}
+            className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-emerald-500/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Bookmark size={14} className="text-emerald-400" />
+              <span className="text-sm font-semibold text-foreground">{'\u{1F4DA}'} Published Library</span>
+              <span className="text-xs text-emerald-400/70 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 font-medium">
+                {publishedStats.total} {publishedStats.total === 1 ? 'entry' : 'entries'} published
+              </span>
+            </div>
+            {showPublishedLibrary ? <ChevronDown size={14} className="text-emerald-400/60" /> : <ChevronRight size={14} className="text-emerald-400/60" />}
+          </button>
+
+          {showPublishedLibrary && (
+            <div className="border-t border-emerald-500/15">
+              {/* Published Stats Bar */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
+                <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/15 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Bookmark size={12} className="text-emerald-400" />
+                    <span className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold">Total</span>
+                  </div>
+                  <p className="text-lg font-bold text-emerald-300">{publishedStats.total}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/15 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Flame size={12} className="text-emerald-400" />
+                    <span className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold">Streak</span>
+                  </div>
+                  <p className="text-lg font-bold text-emerald-300">
+                    {publishedStats.streak}<span className="text-xs text-emerald-400/50 font-normal ml-0.5">{publishedStats.streak === 1 ? 'day' : 'days'}</span>
+                  </p>
+                </div>
+                <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/15 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <BarChart3 size={12} className="text-emerald-400" />
+                    <span className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold">Most Common</span>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-300">
+                    {publishedStats.mostCommonType === 'morning' ? 'Morning' : publishedStats.mostCommonType === 'eod' ? 'EOD' : publishedStats.mostCommonType === 'evening' ? 'Evening' : publishedStats.mostCommonType === 'weekly' ? 'Weekly' : '\u2014'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/15 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp size={12} className="text-emerald-400" />
+                    <span className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold">Avg Mood</span>
+                  </div>
+                  <p className="text-lg font-bold text-emerald-300">
+                    {publishedStats.avgMood > 0 ? publishedStats.avgMood.toFixed(1) : '\u2014'}<span className="text-xs text-emerald-400/50 font-normal">/5</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Published Entry Cards */}
+              <div className="divide-y divide-emerald-500/10">
+                {publishedEntries.map((entry) => {
+                  const isExpanded = expandedPublished.has(entry.id);
+                  const completed = entry.checklist.filter((c) => c.checked).length;
+                  const total = entry.checklist.length;
+                  const TypeIcon = entry.type === 'morning' ? Sun : entry.type === 'evening' ? Moon : entry.type === 'weekly' ? CalendarDays : Moon;
+                  const typeIconColor = entry.type === 'morning' ? 'text-amber-400' : entry.type === 'evening' ? 'text-purple-400' : entry.type === 'weekly' ? 'text-accent' : 'text-indigo-400';
+                  const typeLabel = entry.type === 'morning' ? 'Morning' : entry.type === 'eod' ? 'EOD' : entry.type === 'evening' ? 'Evening' : 'Weekly';
+
+                  // Build preview text
+                  const previewParts = [
+                    ...entry.reflections.filter(Boolean),
+                    (entry.notes ?? '').trim(),
+                    (entry.eveningWentWell ?? '').trim(),
+                  ].filter(Boolean);
+                  const previewText = previewParts.join(' ').slice(0, 100);
+
+                  return (
+                    <div key={entry.id} className="hover:bg-emerald-500/3 transition-colors">
+                      {/* Card header - clickable */}
+                      <button
+                        onClick={() => toggleExpandedPublished(entry.id)}
+                        className="w-full px-5 py-3 flex items-center gap-3 text-left"
+                      >
+                        <div className={`w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0`}>
+                          <TypeIcon size={14} className={typeIconColor} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-foreground">{typeLabel}</span>
+                            <span className="text-xs text-text-muted">{formatDate(entry.date)}</span>
+                            {entry.publishedAt && (
+                              <span className="text-[9px] text-emerald-400/60">{'\u2022'} Published {formatTimestamp(entry.publishedAt)}</span>
+                            )}
+                          </div>
+                          {/* Preview line */}
+                          {previewText && (
+                            <p className="text-xs text-text-muted truncate mt-0.5">{previewText}{previewParts.join(' ').length > 100 ? '...' : ''}</p>
+                          )}
+                          {/* Inline indicators */}
+                          <div className="flex items-center gap-3 mt-1">
+                            {entry.mood && (
+                              <span className="text-[10px] text-text-muted">{moodConfig[entry.mood].emoji} {moodConfig[entry.mood].label}</span>
+                            )}
+                            {entry.energy && (
+                              <span className="text-[10px] text-text-muted">{'\u26A1'}{entry.energy}/5</span>
+                            )}
+                            {total > 0 && (
+                              <span className="text-[10px] text-text-muted">{'\u2705'} {completed}/{total}</span>
+                            )}
+                            {(entry.winOfTheDay ?? '').trim() && (
+                              <span className="text-[10px] text-amber-400/70">{'\u{1F3C6}'} Win logged</span>
+                            )}
+                          </div>
+                        </div>
+                        {isExpanded ? <ChevronDown size={12} className="text-emerald-400/50" /> : <ChevronRight size={12} className="text-emerald-400/50" />}
+                      </button>
+
+                      {/* Expanded content */}
+                      {isExpanded && (
+                        <div className="px-5 pb-4 space-y-3">
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => copyEntryToClipboard(entry)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                            >
+                              <Copy size={11} />
+                              Save to Clipboard
+                            </button>
+                            <button
+                              onClick={() => unpublishEntry(entry.id)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-text-muted hover:bg-rose-500/10 hover:border-rose-500/20 hover:text-rose-400 transition-colors"
+                            >
+                              <X size={11} />
+                              Unpublish
+                            </button>
+                          </div>
+
+                          {/* Win of the Day */}
+                          {(entry.winOfTheDay ?? '').trim() && (
+                            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                              <Trophy size={12} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-[10px] text-amber-400/70 uppercase tracking-wider font-semibold mb-0.5">Win of the Day</p>
+                                <p className="text-xs text-amber-300/90">{entry.winOfTheDay}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Daily prompt response */}
+                          {(entry.dailyPromptResponse ?? '').trim() && (
+                            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-teal-500/5 border border-teal-500/15">
+                              <MessageCircle size={12} className="text-teal-400 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-semibold mb-0.5">Daily Prompt Response</p>
+                                <p className="text-xs text-teal-300/90">{entry.dailyPromptResponse}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Evening-specific fields */}
+                          {entry.type === 'evening' && (
+                            <div className="space-y-2">
+                              {(entry.eveningWentWell ?? '').trim() && (
+                                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/15">
+                                  <Sparkles size={12} className="text-indigo-400 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-semibold mb-0.5">What Went Well</p>
+                                    <p className="text-xs text-indigo-300/90 whitespace-pre-wrap">{entry.eveningWentWell}</p>
+                                  </div>
+                                </div>
+                              )}
+                              {(entry.eveningCouldImprove ?? '').trim() && (
+                                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-purple-500/5 border border-purple-500/15">
+                                  <RotateCcw size={12} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="text-[10px] text-purple-400/70 uppercase tracking-wider font-semibold mb-0.5">Could Have Gone Better</p>
+                                    <p className="text-xs text-purple-300/90 whitespace-pre-wrap">{entry.eveningCouldImprove}</p>
+                                  </div>
+                                </div>
+                              )}
+                              {(entry.eveningGratitude ?? '').trim() && (
+                                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/15">
+                                  <Heart size={12} className="text-indigo-400 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-semibold mb-0.5">Gratitude</p>
+                                    <p className="text-xs text-indigo-300/90 whitespace-pre-wrap">{entry.eveningGratitude}</p>
+                                  </div>
+                                </div>
+                              )}
+                              {(entry.eveningTomorrowPriority ?? '').trim() && (
+                                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-purple-500/5 border border-purple-500/15">
+                                  <Target size={12} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="text-[10px] text-purple-400/70 uppercase tracking-wider font-semibold mb-0.5">Tomorrow&apos;s #1 Priority</p>
+                                    <p className="text-xs text-purple-300/90">{entry.eveningTomorrowPriority}</p>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4 px-3 py-2">
+                                {entry.eveningTomorrowEnergy && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Zap size={12} className="text-indigo-400" />
+                                    <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">Energy:</span>
+                                    <span className="text-xs text-indigo-300 font-medium">{entry.eveningTomorrowEnergy}/5 {energyLabels[entry.eveningTomorrowEnergy]}</span>
+                                  </div>
+                                )}
+                                {(entry.eveningSleepIntention ?? '').trim() && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Moon size={12} className="text-indigo-400" />
+                                    <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">Sleep:</span>
+                                    <span className="text-xs text-indigo-300 font-medium">{entry.eveningSleepIntention}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Checklist */}
+                          {entry.checklist.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold mb-1">Checklist ({completed}/{total})</p>
+                              {entry.checklist.map((item) => (
+                                <div key={item.id} className="flex items-center gap-2">
+                                  <div className={`w-3 h-3 rounded border flex items-center justify-center ${
+                                    item.checked ? 'bg-emerald-500/25 border-emerald-500/50 text-emerald-400' : 'border-white/20'
+                                  }`}>
+                                    {item.checked && <Check size={8} />}
+                                  </div>
+                                  <span className={`text-xs ${item.checked ? 'text-text-muted line-through' : 'text-foreground'}`}>
+                                    {item.text}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Reflections */}
+                          {entry.reflections.filter(Boolean).length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold mb-1">Reflections</p>
+                              {entry.reflections.filter(Boolean).map((r, i) => (
+                                <p key={i} className="text-xs text-text-secondary">&bull; {r}</p>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Wins */}
+                          {entry.wins.filter(Boolean).length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold mb-1">Wins</p>
+                              {entry.wins.filter(Boolean).map((w, i) => (
+                                <p key={i} className="text-xs text-text-secondary">&bull; {w}</p>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Gratitude */}
+                          {entry.gratitude && (
+                            <div>
+                              <p className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold mb-1">Gratitude</p>
+                              <p className="text-xs text-text-secondary">{entry.gratitude}</p>
+                            </div>
+                          )}
+
+                          {/* Notes */}
+                          {entry.notes && (
+                            <div>
+                              <p className="text-[10px] text-emerald-400/60 uppercase tracking-wider font-semibold mb-1">Notes</p>
+                              <p className="text-xs text-text-secondary whitespace-pre-wrap">{entry.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Commitments & Decision Filter (from TeamOS) */}
       {memberOS && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1424,6 +1895,20 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 backdrop-blur-sm shadow-lg shadow-emerald-500/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <ClipboardCheck size={14} className="text-emerald-400" />
+          <span className="text-sm font-medium text-emerald-300">{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="ml-2 text-emerald-400/50 hover:text-emerald-400 transition-colors"
+          >
+            <X size={12} />
+          </button>
         </div>
       )}
     </div>

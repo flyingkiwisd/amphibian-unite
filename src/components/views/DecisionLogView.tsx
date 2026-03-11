@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Scale,
   Plus,
@@ -204,6 +204,8 @@ const initialDecisions: Decision[] = [
   },
 ];
 
+const DECISIONS_LS_KEY = 'amphibian-decisions';
+
 // ── Empty form state ────────────────────────────────────────
 
 const emptyForm = {
@@ -220,7 +222,20 @@ const emptyForm = {
 export function DecisionLogView({ currentUser }: { currentUser?: string }) {
   const ownerName = currentUser ? memberIdToOwnerName[currentUser] : undefined;
 
-  const [decisions, setDecisions] = useState<Decision[]>(initialDecisions);
+  const [decisions, setDecisions] = useState<Decision[]>(() => {
+    if (typeof window === 'undefined') return initialDecisions;
+    try {
+      const stored = localStorage.getItem(DECISIONS_LS_KEY);
+      if (stored) return JSON.parse(stored) as Decision[];
+    } catch { /* ignore */ }
+    return initialDecisions;
+  });
+
+  // Persist decisions to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(DECISIONS_LS_KEY, JSON.stringify(decisions));
+  }, [decisions]);
+
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [showMineOnly, setShowMineOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);

@@ -16,6 +16,7 @@ import {
   Plus,
   Trash2,
   Filter,
+  AlertTriangle,
 } from 'lucide-react';
 
 const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'flat' }) => {
@@ -104,6 +105,9 @@ export function OKRView({ currentUser }: { currentUser?: string }) {
   } = useEditableStore<KPI[]>('amphibian-unite-kpis', kpis);
 
   const hasEdits = hasOkrEdits || hasKpiEdits;
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'okr' | 'kpi'; id: string; label: string } | null>(null);
 
   // Filter OKRs: when "My OKRs" is active, show only OKRs where the user owns at least one key result
   const displayedOkrs = showMyOkrs && ownerName
@@ -253,7 +257,7 @@ export function OKRView({ currentUser }: { currentUser?: string }) {
             >
               {/* Delete button */}
               <button
-                onClick={() => deleteKpi(kpi.id)}
+                onClick={() => setDeleteConfirm({ type: 'kpi', id: kpi.id, label: kpi.category })}
                 className="absolute top-2 right-2 p-1 rounded text-text-muted/30 opacity-0 group-hover/kpi:opacity-100 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
                 title="Delete KPI"
               >
@@ -388,7 +392,7 @@ export function OKRView({ currentUser }: { currentUser?: string }) {
                 />
                 {/* Delete OKR */}
                 <button
-                  onClick={() => deleteOkr(okr.id)}
+                  onClick={() => setDeleteConfirm({ type: 'okr', id: okr.id, label: okr.objective })}
                   className="p-1.5 rounded text-text-muted/30 opacity-0 group-hover/okr:opacity-100 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
                   title="Delete OKR"
                 >
@@ -482,6 +486,47 @@ export function OKRView({ currentUser }: { currentUser?: string }) {
           <span className="text-sm font-medium">Add New OKR</span>
         </button>
       </div>
+
+      {/* ── Delete Confirmation Dialog ── */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xl max-w-md w-full mx-4 animate-fade-in" style={{ animationDelay: '50ms' }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">Delete {deleteConfirm.type === 'okr' ? 'OKR' : 'KPI'}?</h3>
+                <p className="text-sm text-text-muted">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="bg-surface-2 border border-border rounded-lg px-4 py-3 mb-5">
+              <p className="text-sm text-text-secondary font-medium truncate">{deleteConfirm.label}</p>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-2 border border-border transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (deleteConfirm.type === 'okr') {
+                    deleteOkr(deleteConfirm.id);
+                  } else {
+                    deleteKpi(deleteConfirm.id);
+                  }
+                  setDeleteConfirm(null);
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-rose-500 hover:bg-rose-600 shadow-lg shadow-rose-500/20 transition-all duration-200 active:scale-[0.97]"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   User,
   Shield,
@@ -23,6 +23,7 @@ import {
   Bell,
   Layout,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { teamMembers, getMemberById, memberIdToOwnerName } from '@/lib/data';
 import type { TeamMember } from '@/lib/data';
@@ -36,6 +37,7 @@ type SettingsTab = 'os' | 'qualities' | 'feedback' | 'rds' | 'risks' | 'preferen
 
 interface SettingsViewProps {
   currentUser?: string;
+  onLogout?: () => void;
 }
 
 // ── Tab Definitions ────────────────────────────────────────────
@@ -413,18 +415,64 @@ function TabFeedback({ os }: { os: TeamOS }) {
 
 // ── Tab: RDS Framework ──────────────────────────────────────────
 
-function TabRDS({ os }: { os: TeamOS }) {
+type RdsStatus = 'identified' | 'in-progress' | 'done';
+const RDS_STATUS_CYCLE: RdsStatus[] = ['identified', 'in-progress', 'done'];
+const RDS_LS_KEY = 'amphibian-rds-overrides';
+
+function cycleRdsStatus(current: RdsStatus): RdsStatus {
+  const idx = RDS_STATUS_CYCLE.indexOf(current);
+  return RDS_STATUS_CYCLE[(idx + 1) % RDS_STATUS_CYCLE.length];
+}
+
+function ClickableStatusBadge({ status, onClick }: { status: RdsStatus; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Click to cycle status: identified \u2192 in-progress \u2192 done"
+      className={`text-[10px] px-2 py-0.5 rounded-full border font-medium whitespace-nowrap cursor-pointer hover:opacity-80 active:scale-95 transition-all ${statusBadgeColor(status)}`}
+    >
+      {status}
+    </button>
+  );
+}
+
+function TabRDS({ os, memberId }: { os: TeamOS; memberId: string }) {
+  // Load persisted status overrides from localStorage
+  const [overrides, setOverrides] = useState<Record<string, RdsStatus>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = localStorage.getItem(`${RDS_LS_KEY}-${memberId}`);
+      if (stored) return JSON.parse(stored);
+    } catch { /* ignore */ }
+    return {};
+  });
+
+  const getStatus = useCallback((category: string, index: number, original: RdsStatus): RdsStatus => {
+    const key = `${category}-${index}`;
+    return overrides[key] ?? original;
+  }, [overrides]);
+
+  const handleCycle = useCallback((category: string, index: number, current: RdsStatus) => {
+    const key = `${category}-${index}`;
+    const next = cycleRdsStatus(current);
+    setOverrides((prev) => {
+      const updated = { ...prev, [key]: next };
+      localStorage.setItem(`${RDS_LS_KEY}-${memberId}`, JSON.stringify(updated));
+      return updated;
+    });
+  }, [memberId]);
+
   const rds = os.rdsFramework;
 
-  const totalItems = rds.remove.length + rds.delegate.length + rds.systematize.length;
-  const doneItems =
-    rds.remove.filter((r) => r.status === 'done').length +
-    rds.delegate.filter((d) => d.status === 'done').length +
-    rds.systematize.filter((s) => s.status === 'done').length;
-  const inProgressItems =
-    rds.remove.filter((r) => r.status === 'in-progress').length +
-    rds.delegate.filter((d) => d.status === 'in-progress').length +
-    rds.systematize.filter((s) => s.status === 'in-progress').length;
+  // Compute stats with overrides applied
+  const removeStatuses = rds.remove.map((r, i) => getStatus('remove', i, r.status));
+  const delegateStatuses = rds.delegate.map((d, i) => getStatus('delegate', i, d.status));
+  const systematizeStatuses = rds.systematize.map((s, i) => getStatus('systematize', i, s.status));
+  const allStatuses = [...removeStatuses, ...delegateStatuses, ...systematizeStatuses];
+
+  const totalItems = allStatuses.length;
+  const doneItems = allStatuses.filter((s) => s === 'done').length;
+  const inProgressItems = allStatuses.filter((s) => s === 'in-progress').length;
   const progressPct = totalItems > 0 ? ((doneItems + inProgressItems * 0.5) / totalItems) * 100 : 0;
 
   return (
@@ -446,6 +494,7 @@ function TabRDS({ os }: { os: TeamOS }) {
             style={{ width: `${progressPct}%` }}
           />
         </div>
+        <p className="text-white/30 text-[10px] mt-2 italic">Click any status badge below to cycle: identified &rarr; in-progress &rarr; done</p>
       </div>
 
       {/* Three Columns */}
@@ -457,17 +506,18 @@ function TabRDS({ os }: { os: TeamOS }) {
             Remove
           </h3>
           <div className="space-y-3">
-            {rds.remove.map((item, i) => (
-              <div key={i} className="bg-white/5 rounded-lg p-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <p className="text-sm text-white/80 flex-1">{item.item}</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ${statusBadgeColor(item.status)}`}>
-                    {item.status}
-                  </span>
+            {rds.remove.map((item, i) => {
+              const currentStatus = getStatus('remove', i, item.status);
+              return (
+                <div key={i} className="bg-white/5 rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className={`text-sm flex-1 ${currentStatus === 'done' ? 'text-white/40 line-through' : 'text-white/80'}`}>{item.item}</p>
+                    <ClickableStatusBadge status={currentStatus} onClick={() => handleCycle('remove', i, currentStatus)} />
+                  </div>
+                  <p className="text-xs text-white/50">{item.reason}</p>
                 </div>
-                <p className="text-xs text-white/50">{item.reason}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -478,19 +528,20 @@ function TabRDS({ os }: { os: TeamOS }) {
             Delegate
           </h3>
           <div className="space-y-3">
-            {rds.delegate.map((item, i) => (
-              <div key={i} className="bg-white/5 rounded-lg p-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <p className="text-sm text-white/80 flex-1">{item.item}</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ${statusBadgeColor(item.status)}`}>
-                    {item.status}
-                  </span>
+            {rds.delegate.map((item, i) => {
+              const currentStatus = getStatus('delegate', i, item.status);
+              return (
+                <div key={i} className="bg-white/5 rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className={`text-sm flex-1 ${currentStatus === 'done' ? 'text-white/40 line-through' : 'text-white/80'}`}>{item.item}</p>
+                    <ClickableStatusBadge status={currentStatus} onClick={() => handleCycle('delegate', i, currentStatus)} />
+                  </div>
+                  <p className="text-xs text-white/50">
+                    <span className="text-white/40">To:</span> {item.delegateTo}
+                  </p>
                 </div>
-                <p className="text-xs text-white/50">
-                  <span className="text-white/40">To:</span> {item.delegateTo}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -501,19 +552,20 @@ function TabRDS({ os }: { os: TeamOS }) {
             Systematize
           </h3>
           <div className="space-y-3">
-            {rds.systematize.map((item, i) => (
-              <div key={i} className="bg-white/5 rounded-lg p-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <p className="text-sm text-white/80 flex-1">{item.item}</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ${statusBadgeColor(item.status)}`}>
-                    {item.status}
-                  </span>
+            {rds.systematize.map((item, i) => {
+              const currentStatus = getStatus('systematize', i, item.status);
+              return (
+                <div key={i} className="bg-white/5 rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className={`text-sm flex-1 ${currentStatus === 'done' ? 'text-white/40 line-through' : 'text-white/80'}`}>{item.item}</p>
+                    <ClickableStatusBadge status={currentStatus} onClick={() => handleCycle('systematize', i, currentStatus)} />
+                  </div>
+                  <p className="text-xs text-white/50">
+                    <span className="text-white/40">System:</span> {item.system}
+                  </p>
                 </div>
-                <p className="text-xs text-white/50">
-                  <span className="text-white/40">System:</span> {item.system}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -754,7 +806,7 @@ function TabBasicProfile({ member }: { member: TeamMember }) {
 
 // ── Main Component ──────────────────────────────────────────────
 
-export function SettingsView({ currentUser }: SettingsViewProps) {
+export function SettingsView({ currentUser, onLogout }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('os');
 
   const member = useMemo(() => {
@@ -800,7 +852,7 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
       case 'feedback':
         return <TabFeedback os={os!} />;
       case 'rds':
-        return <TabRDS os={os!} />;
+        return <TabRDS os={os!} memberId={member!.id} />;
       case 'risks':
         return <TabRisks os={os!} />;
       case 'preferences':
@@ -841,6 +893,20 @@ export function SettingsView({ currentUser }: SettingsViewProps) {
       <div key={activeTab}>
         {renderTabContent()}
       </div>
+
+      {/* Logout Button */}
+      {onLogout && (
+        <div className="mt-8 pt-6 border-t border-white/10 animate-fade-in">
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-200 text-sm font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+          <p className="text-white/30 text-xs mt-2">This will return you to the login screen.</p>
+        </div>
+      )}
     </div>
   );
 }

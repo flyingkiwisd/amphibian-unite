@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { exportToPdf } from '@/lib/exportPdf';
 import { memberIdToOwnerName } from '@/lib/data';
+
+const TASKS_LS_KEY = 'amphibian-tasks';
 import {
   List,
   LayoutGrid,
@@ -496,7 +498,20 @@ function TaskModal({
 
 export function TasksView({ currentUser }: { currentUser?: string }) {
   const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? '' : '';
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    if (typeof window === 'undefined') return initialTasks;
+    try {
+      const stored = localStorage.getItem(TASKS_LS_KEY);
+      if (stored) return JSON.parse(stored) as Task[];
+    } catch { /* ignore */ }
+    return initialTasks;
+  });
+
+  // Persist tasks to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(TASKS_LS_KEY, JSON.stringify(tasks));
+  }, [tasks]);
+
   const [filter, setFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [sortField, setSortField] = useState<SortField>('priority');

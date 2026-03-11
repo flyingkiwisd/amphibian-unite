@@ -93,32 +93,90 @@ const statusBg = (status: CommitmentStatus) => {
 
 // ── Mock data generator ───────────────────────────────────
 
+const mockCommitmentsByMember: Record<string, string[][]> = {
+  james: [
+    ['COO interview prep with recruiting firm', 'Review Dynamic Alpha sleeve architecture doc', 'Finalize Q2 priority stack'],
+    ['LP call with Carson Group CIO', 'Edge rating improvement plan review', 'Board meeting prep with David'],
+    ['CTO candidate pipeline review', 'Weekly Top 3 alignment with Ty and Andrew', 'Unite OS sprint planning'],
+    ['COO shortlist narrowed to 3 candidates', 'LP deck updated with Q1 performance', 'Strategic planning session'],
+    ['Weekly retrospective and next week prep', 'Review risk dashboard v1 progress', 'Team 1:1 with Thao'],
+  ],
+  david: [
+    ['Board agenda preparation for quarterly review', 'Review governance committee findings', 'Strategic partnership intro call'],
+    ['Fiduciary oversight checklist update', 'Board minutes review and approval', 'Distribution partner evaluation'],
+    ['Board-level accountability review', 'Qualified introduction follow-ups', 'Governance standards audit'],
+    ['Strategic guidance session with James', 'Partnership progress tracking update', 'Board decision documentation'],
+    ['Weekly board action items review', 'Introduction pipeline update', 'Board meeting debrief'],
+  ],
+  mark: [
+    ['Weekly cash forecast publish', 'Budget tool development check', 'Accounting support interviews'],
+    ['Monthly downside review prep', 'Cash runway visibility dashboard', 'Scenario planning update'],
+    ['Financial decision tools review', 'Budget variance analysis', 'Entity complexity assessment'],
+    ['Cash flow projections update', 'Break-even AUM model refresh', 'Revenue tracking review'],
+    ['Weekly financial summary', 'Budget tool testing', 'Accounting hire decision'],
+  ],
+  todd: [
+    ['LP update draft for Q1 performance', 'Investor comms cadence review', 'Statement clarity audit'],
+    ['Redemption process SLA documentation', 'LP retention metrics review', 'Carson Group follow-up prep'],
+    ['Investor ops handoff readiness check', 'Fundraising pipeline update', 'LP satisfaction survey analysis'],
+    ['Quarterly investor letter draft', 'Governance maturity support session', 'New LP onboarding prep'],
+    ['Weekly investor relations summary', 'LP trust metrics dashboard update', 'Surprise reduction checklist'],
+  ],
+  paola: [
+    ['Partnership strategy deck update', 'Institutional credibility assessment', 'BD pipeline review'],
+    ['Allocator meeting prep', 'Growth strategy alignment session', 'Brand positioning review'],
+    ['Strategic partnership outreach', 'Mandate and economics alignment', 'Distribution channel evaluation'],
+    ['Partnership outcome tracking', 'High-quality meeting follow-ups', 'Governance clarity documentation'],
+    ['Weekly BD summary', 'Partnership pipeline metrics', 'Growth targets review'],
+  ],
+  andrew: [
+    ['SMA infrastructure vendor evaluation', 'Governance agreement draft review', 'Compliance checklist update'],
+    ['Dynamic Alpha legal framework review', 'Post-merger operating model doc', 'A9 audit progress check'],
+    ['Security posture assessment', 'Decision documentation backlog clear', 'IP strategy memo'],
+    ['SMA PB evaluation meeting', 'Advisory revenue tracking update', 'Product architecture review'],
+    ['Weekly compliance review', 'Governance docs finalization', 'Dynamic Alpha progress update'],
+  ],
+  ty: [
+    ['BTC Alpha yield source mapping review', 'Risk governance limits documentation', 'Portfolio risk quality assessment'],
+    ['Manager selection evaluation for A9', 'HRP/MVO engine progress check', 'Risk dashboard v1 testing'],
+    ['Options structures evaluation', 'DeFi integration risk assessment', 'IC Portfolio Memo draft'],
+    ['BTC yield strategy optimization', 'Exception hygiene audit', 'Kill criteria progress review'],
+    ['Weekly portfolio risk summary', 'Strategy evaluation pipeline', 'Risk limits compliance check'],
+  ],
+  ross: [
+    ['Map BTC yield sources with bps attribution', 'SMA exchange account setup progress', 'Portfolio process documentation'],
+    ['Counterparty onboarding checklist', 'Performance drift analysis', 'Custody provider evaluation update'],
+    ['Day-to-day PM execution review', 'Risk limits adherence audit', 'Decision discipline implementation'],
+    ['SMA infrastructure testing', 'Monthly outcomes consistency report', 'Portfolio changes documentation'],
+    ['Weekly PM execution summary', 'Counterparty management review', 'SMA setup progress update'],
+  ],
+  thao: [
+    ['Investor ops delivery SLA tracking', 'Internal workflow optimization', 'Project management sprint planning'],
+    ['Cross-functional priority tracking', 'Operations execution quality review', 'Ball tracking dashboard update'],
+    ['Workflow quality audit', 'Investor ops process refinement', 'Team operations sync'],
+    ['SLA performance metrics review', 'Operations playbook update', 'Financial controller reconciliation'],
+    ['Weekly ops execution summary', 'Priority alignment check', 'Process improvement proposals'],
+  ],
+  timon: [
+    ['Risk dashboard development sprint', 'Data pipeline monitoring setup', 'Regime classifier research'],
+    ['Portfolio analytics engine testing', 'Data quality assessment', 'Tech infrastructure review'],
+    ['Risk model backtesting session', 'Data warehouse optimization', 'API integration testing'],
+    ['Dashboard UI improvements', 'Performance monitoring setup', 'Data pipeline reliability check'],
+    ['Weekly tech sprint review', 'Infrastructure health check', 'Analytics delivery status'],
+  ],
+  sahir: [
+    ['Quantitative strategy backtesting', 'Signal generation pipeline review', 'Alpha research documentation'],
+    ['Market microstructure analysis', 'Strategy performance attribution', 'New signal prototype testing'],
+    ['Cross-exchange arbitrage research', 'Execution optimization study', 'Factor model calibration'],
+    ['Strategy correlation analysis', 'Regime-dependent performance review', 'Signal decay monitoring'],
+    ['Weekly quant research summary', 'Strategy pipeline evaluation', 'Performance review and attribution'],
+  ],
+};
+
 const generateMockData = (): MemberData => {
   const data: MemberData = {};
   const currentWeek = getWeekDates(0);
-  const mockCommitments: Record<string, string[][]> = {
-    james: [
-      ['COO interview prep with recruiting firm', 'Review Dynamic Alpha sleeve architecture doc', 'Finalize Q2 priority stack'],
-      ['LP call with Carson Group CIO', 'Edge rating improvement plan review', 'Board meeting prep with David'],
-      ['CTO candidate pipeline review', 'Weekly Top 3 alignment with Ty and Andrew', 'Unite OS sprint planning'],
-      ['COO shortlist narrowed to 3 candidates', 'LP deck updated with Q1 performance', 'Strategic planning session'],
-      ['Weekly retrospective and next week prep', 'Review risk dashboard v1 progress', 'Team 1:1 with Thao'],
-    ],
-    andrew: [
-      ['SMA infrastructure vendor evaluation', 'Governance agreement draft review', 'Compliance checklist update'],
-      ['Dynamic Alpha legal framework review', 'Post-merger operating model doc', 'A9 audit progress check'],
-      ['Security posture assessment', 'Decision documentation backlog clear', 'IP strategy memo'],
-      ['SMA PB evaluation meeting', 'Advisory revenue tracking update', 'Product architecture review'],
-      ['Weekly compliance review', 'Governance docs finalization', 'Dynamic Alpha progress update'],
-    ],
-    mark: [
-      ['Weekly cash forecast publish', 'Budget tool development check', 'Accounting support interviews'],
-      ['Monthly downside review prep', 'Cash runway visibility dashboard', 'Scenario planning update'],
-      ['Financial decision tools review', 'Budget variance analysis', 'Entity complexity assessment'],
-      ['Cash flow projections update', 'Break-even AUM model refresh', 'Revenue tracking review'],
-      ['Weekly financial summary', 'Budget tool testing', 'Accounting hire decision'],
-    ],
-  };
+  const activeMembers = teamMembers.filter((m) => m.status !== 'hiring');
 
   const statuses: CommitmentStatus[][] = [
     ['completed', 'completed', 'partial'],
@@ -128,9 +186,12 @@ const generateMockData = (): MemberData => {
     ['pending', 'pending', 'pending'],
   ];
 
-  for (const memberId of Object.keys(mockCommitments)) {
+  for (const member of activeMembers) {
+    const memberId = member.id;
+    const commitmentSets = mockCommitmentsByMember[memberId];
+    if (!commitmentSets) continue;
+
     const entries: DayEntry[] = [];
-    const commitmentSets = mockCommitments[memberId];
     for (let i = 0; i < Math.min(currentWeek.length, commitmentSets.length); i++) {
       const dayCommitments = commitmentSets[i];
       const dayStatuses = statuses[i];

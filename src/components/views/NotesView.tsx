@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { memberIdToOwnerName } from '@/lib/data';
+
+const NOTES_LS_KEY = 'amphibian-notes';
 import {
   StickyNote,
   Plus,
@@ -132,7 +134,20 @@ const formatTime = (iso: string) => {
 
 export function NotesView({ currentUser }: { currentUser?: string }) {
   const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? '' : '';
-  const [notes, setNotes] = useState<Note[]>(initialNotes);
+  const [notes, setNotes] = useState<Note[]>(() => {
+    if (typeof window === 'undefined') return initialNotes;
+    try {
+      const stored = localStorage.getItem(NOTES_LS_KEY);
+      if (stored) return JSON.parse(stored) as Note[];
+    } catch { /* ignore */ }
+    return initialNotes;
+  });
+
+  // Persist notes to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(NOTES_LS_KEY, JSON.stringify(notes));
+  }, [notes]);
+
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [search, setSearch] = useState('');

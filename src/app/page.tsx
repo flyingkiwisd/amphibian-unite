@@ -180,7 +180,7 @@ export default function Home() {
       case 'knowledge-graph': return <KnowledgeGraphView currentUser={currentUser ?? 'james'} />;
       case 'role-drift': return <RoleDriftView currentUser={currentUser ?? 'james'} />;
       case 'journal': return <JournalView currentUser={currentUser ?? 'james'} />;
-      case 'settings': return <SettingsView currentUser={currentUser ?? 'james'} />;
+      case 'settings': return <SettingsView currentUser={currentUser ?? 'james'} onLogout={() => { setIsLoggedIn(false); setLocalUser(null); setCurrentView('dashboard'); }} />;
       default: return <DashboardView onNavigate={handleNavigate} currentUser={currentUser ?? 'james'} />;
     }
   };
