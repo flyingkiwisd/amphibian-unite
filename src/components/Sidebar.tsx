@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutDashboard,
-  Bot,
   Users,
   Target,
   CheckSquare,
@@ -20,6 +19,7 @@ import {
   Settings,
   Check,
   ArrowRightLeft,
+  Compass,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 
@@ -59,6 +59,7 @@ const navItems: { label: string; icon: React.ElementType; view: ViewType; group:
   { label: 'Decisions', icon: Scale, view: 'decisions', group: 1 },
   { label: 'Journal', icon: BookOpen, view: 'journal', group: 1 },
   { label: 'Team', icon: Users, view: 'team', group: 1 },
+  { label: 'Role Drift', icon: Compass, view: 'role-drift', group: 1 },
   // More
   { label: 'Notes', icon: StickyNote, view: 'notes', group: 2 },
   { label: 'Roadmap', icon: Map, view: 'roadmap', group: 2 },

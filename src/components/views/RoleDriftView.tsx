@@ -12,8 +12,12 @@ import {
   Shield,
   Plus,
   Trash2,
+  Target,
+  TrendingUp,
+  ArrowRight,
+  Layers,
 } from 'lucide-react';
-import { teamMembers } from '@/lib/data';
+import { teamMembers, okrs, roadmapPhases, memberIdToOwnerName } from '@/lib/data';
 import { getTeamMemberOS } from '@/lib/teamOS';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, InlineNumber, EditBanner } from '@/components/InlineEdit';
@@ -232,14 +236,138 @@ export function RoleDriftView({ currentUser }: { currentUser?: string }) {
         <div className="flex items-center gap-3 mb-2">
           <Compass className="w-7 h-7 text-teal-400" />
           <h1 className="text-3xl font-bold text-text-primary">
-            <span className="gradient-text">Role Drift Detection</span>
+            <span className="gradient-text">Role Drift & Alignment</span>
           </h1>
         </div>
         <p className="text-text-secondary text-lg max-w-3xl">
-          Compare what each team member is supposed to own versus what they are actually
-          doing. Catch misalignment before it becomes a problem.
+          Are we all rowing in the same direction? Track role alignment, catch drift early, and ensure every team member&apos;s work ladders up to OKRs and the roadmap.
         </p>
       </div>
+
+      {/* ── OKR Alignment Overview ── */}
+      {(() => {
+        const activePhase = roadmapPhases.find((p) => p.status === 'active');
+        const okrsOnTrack = okrs.filter((o) => o.status === 'on-track').length;
+        const okrsAtRisk = okrs.filter((o) => o.status === 'at-risk').length;
+        const okrsBehind = okrs.filter((o) => o.status === 'behind').length;
+
+        // Calculate per-OKR alignment with drift data — how many owners are low-drift (well aligned)
+        const okrAlignmentData = okrs.map((okr) => {
+          const owners = okr.keyResults.map((kr) => {
+            const memberId = Object.entries(memberIdToOwnerName).find(([, name]) => name === kr.owner)?.[0];
+            const memberDrift = driftData.find((d) => d.memberId === memberId);
+            return {
+              name: kr.owner,
+              driftScore: memberDrift?.driftScore ?? 0,
+              progress: kr.progress,
+            };
+          });
+          const avgDriftForOkr = owners.length > 0
+            ? Math.round(owners.reduce((s, o) => s + o.driftScore, 0) / owners.length)
+            : 0;
+          const avgProgress = owners.length > 0
+            ? Math.round(owners.reduce((s, o) => s + o.progress, 0) / owners.length)
+            : 0;
+          return { okr, owners, avgDrift: avgDriftForOkr, avgProgress };
+        });
+
+        // Team alignment = inverse of avg drift
+        const teamAlignmentPct = Math.max(0, 100 - (avgDrift * 4));
+        const alignColor = teamAlignmentPct >= 70 ? 'text-emerald-400' : teamAlignmentPct >= 40 ? 'text-amber-400' : 'text-rose-400';
+
+        return (
+          <div
+            className="bg-surface border border-border rounded-xl p-6 animate-fade-in"
+            style={{ animationDelay: '25ms', opacity: 0 }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Layers className="w-5 h-5 text-accent" />
+              <h2 className="text-lg font-semibold text-text-primary">Are We Rowing Together?</h2>
+              {activePhase && (
+                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-accent/15 text-accent font-bold uppercase tracking-wider">
+                  Phase: {activePhase.phase} ({activePhase.when})
+                </span>
+              )}
+            </div>
+
+            {/* OKR-to-Owner alignment rows */}
+            <div className="space-y-3">
+              {okrAlignmentData.map(({ okr, owners, avgDrift: okrDrift, avgProgress }) => {
+                const statusColor = okr.status === 'on-track' ? 'bg-emerald-500' : okr.status === 'at-risk' ? 'bg-amber-500' : 'bg-rose-500';
+                const statusBadge = okr.status === 'on-track' ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' : okr.status === 'at-risk' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-rose-400 bg-rose-500/15 border-rose-500/30';
+                const driftOk = okrDrift < 15;
+
+                return (
+                  <div key={okr.id} className="flex items-center gap-4 p-3 rounded-lg bg-surface-2 hover:bg-surface-3 transition-colors">
+                    {/* OKR objective */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Target className="w-3.5 h-3.5 text-accent shrink-0" />
+                        <p className="text-xs font-medium text-text-primary truncate">{okr.objective}</p>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full border shrink-0 ${statusBadge}`}>
+                          {okr.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${statusColor}`} style={{ width: `${avgProgress}%` }} />
+                        </div>
+                        <span className="text-[10px] text-text-muted font-mono w-8">{avgProgress}%</span>
+                      </div>
+                    </div>
+
+                    {/* Owners */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {owners.map((o) => {
+                        const member = teamMembers.find((m) => memberIdToOwnerName[m.id] === o.name);
+                        return (
+                          <div
+                            key={o.name}
+                            title={`${o.name}: ${o.driftScore}% drift, ${o.progress}% progress`}
+                            className={`w-7 h-7 rounded-full ${member?.color ?? 'bg-gray-500'} flex items-center justify-center text-[9px] font-bold text-white ${
+                              o.driftScore >= 15 ? 'ring-2 ring-amber-400/60' : 'ring-1 ring-white/10'
+                            }`}
+                          >
+                            {member?.avatar ?? o.name[0]}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Drift indicator */}
+                    <div className={`text-xs font-semibold shrink-0 w-20 text-right ${driftOk ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {driftOk ? '✓ Aligned' : '⚠ Watch'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Summary footer */}
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-border text-xs">
+              <div className="flex items-center gap-4">
+                <span className="text-text-muted">OKRs:</span>
+                <span className="flex items-center gap-1 text-emerald-400">
+                  <CheckCircle className="w-3 h-3" /> {okrsOnTrack} on track
+                </span>
+                {okrsAtRisk > 0 && (
+                  <span className="flex items-center gap-1 text-amber-400">
+                    <Clock className="w-3 h-3" /> {okrsAtRisk} at risk
+                  </span>
+                )}
+                {okrsBehind > 0 && (
+                  <span className="flex items-center gap-1 text-rose-400">
+                    <AlertTriangle className="w-3 h-3" /> {okrsBehind} behind
+                  </span>
+                )}
+              </div>
+              <div className={`font-bold ${alignColor}`}>
+                Team Alignment: {teamAlignmentPct}%
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Personal Summary ── */}
       {currentUser && (() => {

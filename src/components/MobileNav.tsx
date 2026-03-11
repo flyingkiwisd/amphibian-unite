@@ -2,7 +2,6 @@
 
 import {
   LayoutDashboard,
-  Bot,
   CheckSquare,
   Target,
   MoreHorizontal,
@@ -15,6 +14,7 @@ import {
   Trophy,
   BookOpen,
   Settings,
+  Compass,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -39,6 +39,7 @@ const moreTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
   { label: 'Notes', icon: StickyNote, view: 'notes' },
   { label: 'Roadmap', icon: Map, view: 'roadmap' },
   { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway' },
+  { label: 'Role Drift', icon: Compass, view: 'role-drift' },
   { label: 'Leaderboard', icon: Trophy, view: 'leaderboard' },
   { label: 'Settings', icon: Settings, view: 'settings' },
 ];

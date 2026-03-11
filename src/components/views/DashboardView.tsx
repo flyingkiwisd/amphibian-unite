@@ -28,11 +28,15 @@ import {
   Link2,
   BarChart3,
   Zap,
+  Compass,
+  Layers,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   teamMembers,
   okrs,
   kpis,
+  roadmapPhases,
   memberIdToOwnerName,
 } from '@/lib/data';
 import { useEditableStore } from '@/lib/useEditableStore';
@@ -288,7 +292,7 @@ const okrBarColor = (status: string) => {
 const quickActions = [
   { label: 'OKRs & KPIs', icon: Target, view: 'okrs' },
   { label: 'Tasks', icon: CheckSquare, view: 'tasks' },
-  { label: 'Accountability', icon: ClipboardCheck, view: 'accountability' },
+  { label: 'Role Drift', icon: Compass, view: 'role-drift' },
   { label: 'What Changed', icon: RefreshCw, view: 'what-changed' },
   { label: 'Team', icon: Users, view: 'team' },
   { label: 'Roadmap', icon: Map, view: 'roadmap' },
@@ -1405,37 +1409,208 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
         </div>
       </div>
 
-      {/* ════════════ Section 6: Company Pulse (Condensed) ════════════ */}
-      <div
-        className="bg-surface border border-border rounded-xl p-5 animate-fade-in"
-        style={{ animationDelay: '475ms' }}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Star className="w-4 h-4 text-accent fill-accent" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-accent">Company Pulse</span>
+      {/* ════════════ Section 6: Strategic Alignment (KPIs ↔ OKRs ↔ Roadmap) ════════════ */}
+      <div className="animate-fade-in" style={{ animationDelay: '475ms' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+            <Layers className="w-5 h-5 text-accent" />
+            Strategic Alignment
+          </h3>
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-text-muted">Are we rowing in the same direction?</span>
           </div>
-
-          <div className="flex flex-wrap items-center gap-6">
-            {companyKpis.map((kpi) => (
-              <div key={kpi.id} className="text-center">
-                <p className="text-[10px] text-text-muted uppercase tracking-wide">{kpi.name}</p>
-                <p className="text-lg font-bold text-text-primary">{kpi.value}</p>
-              </div>
-            ))}
-            <div className="text-center">
-              <p className="text-[10px] text-text-muted uppercase tracking-wide">North Star</p>
-              <p className="text-lg font-bold text-accent">$1B+</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => onNavigate('roadmap')}
-            className="text-xs text-accent hover:text-accent-2 transition-colors flex items-center gap-1 flex-shrink-0"
-          >
-            Roadmap <ChevronRight className="w-3 h-3" />
-          </button>
         </div>
+
+        {/* Current Roadmap Phase */}
+        {(() => {
+          const activePhase = roadmapPhases.find((p) => p.status === 'active');
+          const nextPhase = roadmapPhases.find((p) => p.status === 'upcoming');
+          if (!activePhase) return null;
+
+          // Map KPIs to OKRs — which KPIs are driven by which OKRs
+          const kpiOkrLinks: { kpi: typeof kpis[0]; linkedOkrs: typeof okrs }[] = [
+            { kpi: kpis[0], linkedOkrs: okrs.filter((o) => o.id === 'okr-2') }, // AUM ← Dynamic Alpha
+            { kpi: kpis[1], linkedOkrs: okrs.filter((o) => o.id === 'okr-5') }, // Edge Rating ← AI Edge
+            { kpi: kpis[2], linkedOkrs: okrs.filter((o) => o.id === 'okr-1') }, // BTC Alpha ← BTC Alpha OKR
+            { kpi: kpis[4], linkedOkrs: okrs.filter((o) => o.id === 'okr-3') }, // Team Size ← Hire COO/CTO
+          ];
+
+          // Overall alignment score
+          const allOkrProgress = okrs.flatMap((o) => o.keyResults.map((kr) => kr.progress));
+          const avgOkrProgress = Math.round(allOkrProgress.reduce((a, b) => a + b, 0) / allOkrProgress.length);
+          const okrsOnTrack = okrs.filter((o) => o.status === 'on-track').length;
+          const okrsAtRisk = okrs.filter((o) => o.status === 'at-risk').length;
+          const alignmentScore = Math.round((okrsOnTrack / okrs.length) * 100);
+
+          const alignmentColor = alignmentScore >= 60 ? 'text-emerald-400' : alignmentScore >= 40 ? 'text-amber-400' : 'text-rose-400';
+          const alignmentBg = alignmentScore >= 60 ? 'bg-emerald-500/15 border-emerald-500/30' : alignmentScore >= 40 ? 'bg-amber-500/15 border-amber-500/30' : 'bg-rose-500/15 border-rose-500/30';
+
+          return (
+            <div className="space-y-4">
+              {/* Phase + Alignment Score Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Active Phase */}
+                <div className="bg-surface border border-accent/30 rounded-xl p-5 relative overflow-hidden lg:col-span-2">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-400 to-blue-500" />
+                  <div className="pl-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/15 text-accent font-bold uppercase tracking-wider">Now</span>
+                      <span className="text-xs text-text-muted">{activePhase.when}</span>
+                    </div>
+                    <h4 className="text-lg font-bold text-text-primary mb-1">{activePhase.phase}</h4>
+                    <p className="text-xs text-text-secondary mb-3">{activePhase.description}</p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-xs">
+                        <span className="text-text-muted">Edge: </span>
+                        <span className="text-accent font-semibold">{activePhase.edge}</span>
+                      </div>
+                      {nextPhase && (
+                        <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                          <ChevronRight className="w-3 h-3" />
+                          Next: <span className="text-text-secondary font-medium">{nextPhase.phase}</span>
+                          <span className="text-text-muted">({nextPhase.when})</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => onNavigate('roadmap')}
+                        className="ml-auto text-xs text-accent hover:text-accent/80 flex items-center gap-1"
+                      >
+                        Full Roadmap <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Alignment Score Card */}
+                <div className={`bg-surface border rounded-xl p-5 flex flex-col items-center justify-center ${alignmentBg}`}>
+                  <p className="text-[10px] text-text-muted uppercase tracking-wider mb-2">Alignment Score</p>
+                  <p className={`text-4xl font-bold ${alignmentColor}`}>{alignmentScore}%</p>
+                  <div className="flex items-center gap-3 mt-3 text-xs">
+                    <span className="flex items-center gap-1 text-emerald-400">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {okrsOnTrack} on track
+                    </span>
+                    <span className="flex items-center gap-1 text-amber-400">
+                      <AlertTriangle className="w-3 h-3" />
+                      {okrsAtRisk} at risk
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onNavigate('role-drift')}
+                    className="mt-3 text-[10px] text-accent hover:text-accent/80 flex items-center gap-1"
+                  >
+                    <Compass className="w-3 h-3" /> Role Drift Check
+                  </button>
+                </div>
+              </div>
+
+              {/* KPI → OKR Connection Map */}
+              <div className="bg-surface border border-border rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Link2 className="w-4 h-4 text-accent" />
+                  <span className="text-xs font-semibold text-text-primary uppercase tracking-wider">KPIs → OKRs → Roadmap</span>
+                  <span className="text-[10px] text-text-muted ml-auto">How metrics connect to execution</span>
+                </div>
+                <div className="space-y-3">
+                  {kpiOkrLinks.map(({ kpi, linkedOkrs: linked }) => {
+                    const okr = linked[0];
+                    if (!okr) return null;
+                    const avgProgress = Math.round(
+                      okr.keyResults.reduce((s, kr) => s + kr.progress, 0) / okr.keyResults.length
+                    );
+                    const statusColor = okr.status === 'on-track' ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' : okr.status === 'at-risk' ? 'text-amber-400 bg-amber-500/15 border-amber-500/30' : 'text-rose-400 bg-rose-500/15 border-rose-500/30';
+                    const trendIcon = kpi.trend === 'up' ? <TrendingUp className="w-3 h-3 text-emerald-400" /> : kpi.trend === 'down' ? <TrendingUp className="w-3 h-3 text-rose-400 rotate-180" /> : <BarChart3 className="w-3 h-3 text-text-muted" />;
+
+                    return (
+                      <div
+                        key={kpi.id}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-surface-2 hover:bg-surface-3 transition-colors group"
+                      >
+                        {/* KPI */}
+                        <div className="flex items-center gap-2 w-36 shrink-0">
+                          {trendIcon}
+                          <div>
+                            <p className="text-xs font-semibold text-text-primary">{kpi.name}</p>
+                            <p className="text-[10px] text-text-muted">{kpi.value}</p>
+                          </div>
+                        </div>
+
+                        {/* Arrow connector */}
+                        <div className="flex items-center gap-1 text-text-muted/30 shrink-0">
+                          <div className="w-6 h-px bg-text-muted/20" />
+                          <ChevronRight className="w-3 h-3" />
+                        </div>
+
+                        {/* OKR */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-xs text-text-secondary truncate">{okr.objective}</p>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full border shrink-0 ${statusColor}`}>
+                              {okr.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  okr.status === 'on-track' ? 'bg-emerald-500' : okr.status === 'at-risk' ? 'bg-amber-500' : 'bg-rose-500'
+                                }`}
+                                style={{ width: `${avgProgress}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-text-muted font-mono">{avgProgress}%</span>
+                          </div>
+                        </div>
+
+                        {/* Target */}
+                        <div className="text-right shrink-0 hidden sm:block">
+                          <p className="text-[10px] text-text-muted">Target</p>
+                          <p className="text-xs font-semibold text-accent">{kpi.target}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Avg OKR Progress Footer */}
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-text-muted">Overall OKR Progress:</span>
+                    <div className="w-24 h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                      <div className="h-full bg-accent rounded-full" style={{ width: `${avgOkrProgress}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-accent">{avgOkrProgress}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => onNavigate('okrs')} className="text-[10px] text-accent hover:text-accent/80 flex items-center gap-1">
+                      OKRs <ChevronRight className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => onNavigate('cash-runway')} className="text-[10px] text-accent hover:text-accent/80 flex items-center gap-1">
+                      Financials <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* North Star Bar */}
+              <div className="bg-surface border border-border rounded-xl p-4 flex items-center gap-4">
+                <Star className="w-4 h-4 text-accent fill-accent shrink-0" />
+                <div className="flex flex-wrap items-center gap-6 flex-1">
+                  {companyKpis.map((kpi) => (
+                    <div key={kpi.id} className="text-center">
+                      <p className="text-[10px] text-text-muted uppercase tracking-wide">{kpi.name}</p>
+                      <p className="text-lg font-bold text-text-primary">{kpi.value}</p>
+                    </div>
+                  ))}
+                  <div className="text-center">
+                    <p className="text-[10px] text-text-muted uppercase tracking-wide">North Star</p>
+                    <p className="text-lg font-bold text-accent">$1B+</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ════════════ Section 7: Quick Actions ════════════ */}
