@@ -175,6 +175,12 @@ export function AIChatPanel({
       // Remove the last message (we send it separately)
       conversationHistory.pop();
 
+      // Read user's personal API key from localStorage
+      let userApiKey: string | null = null;
+      try {
+        userApiKey = localStorage.getItem(`amphibian-ai-apikey-${memberId}`);
+      } catch { /* ignore */ }
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -187,6 +193,7 @@ export function AIChatPanel({
             ...context,
           },
           conversationHistory,
+          ...(userApiKey ? { apiKey: userApiKey } : {}),
         }),
       });
 

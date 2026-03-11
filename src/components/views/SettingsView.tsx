@@ -24,6 +24,11 @@ import {
   Layout,
   ChevronRight,
   LogOut,
+  Key,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Check,
 } from 'lucide-react';
 import { teamMembers, getMemberById, memberIdToOwnerName } from '@/lib/data';
 import type { TeamMember } from '@/lib/data';
@@ -673,8 +678,109 @@ function TabPreferences({ memberId }: { memberId: string }) {
     defaultPreferences
   );
 
+  // AI API Key state
+  const AI_KEY_STORAGE = `amphibian-ai-apikey-${memberId}`;
+  const [aiKeyInput, setAiKeyInput] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem(AI_KEY_STORAGE) || '';
+  });
+  const [showKey, setShowKey] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
+
+  const handleSaveKey = useCallback(() => {
+    const trimmed = aiKeyInput.trim();
+    if (trimmed) {
+      localStorage.setItem(AI_KEY_STORAGE, trimmed);
+    } else {
+      localStorage.removeItem(AI_KEY_STORAGE);
+    }
+    setKeySaved(true);
+    setTimeout(() => setKeySaved(false), 2000);
+  }, [aiKeyInput, AI_KEY_STORAGE]);
+
+  const handleClearKey = useCallback(() => {
+    localStorage.removeItem(AI_KEY_STORAGE);
+    setAiKeyInput('');
+    setKeySaved(false);
+  }, [AI_KEY_STORAGE]);
+
+  const hasKey = aiKeyInput.trim().length > 0;
+  const maskedKey = hasKey
+    ? `${aiKeyInput.slice(0, 10)}${'•'.repeat(20)}${aiKeyInput.slice(-4)}`
+    : '';
+
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* AI Configuration — Most important, shown first */}
+      <SectionCard title="AI Advisor — Your Claude API Key" icon={<Sparkles className="w-4 h-4 text-teal-400" />}>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-white/80 mb-1">Personal API Key</p>
+            <p className="text-xs text-white/40 mb-3">
+              Each team member connects their own Claude API key. Your key is stored locally in your browser — it never leaves your device except to authenticate with Anthropic.
+            </p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={aiKeyInput}
+                  onChange={(e) => { setAiKeyInput(e.target.value); setKeySaved(false); }}
+                  placeholder="sk-ant-api03-..."
+                  className="w-full bg-white/5 border border-white/15 rounded-lg pl-10 pr-10 py-2.5 text-sm text-white/80 placeholder:text-white/25 focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 outline-none transition-colors font-mono"
+                />
+                <button
+                  onClick={() => setShowKey(!showKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                  title={showKey ? 'Hide key' : 'Show key'}
+                >
+                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <button
+                onClick={handleSaveKey}
+                disabled={!aiKeyInput.trim()}
+                className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                  keySaved
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : aiKeyInput.trim()
+                      ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30'
+                      : 'bg-white/5 text-white/25 border border-white/10 cursor-not-allowed'
+                }`}
+              >
+                {keySaved ? <><Check className="w-3.5 h-3.5" /> Saved</> : 'Save'}
+              </button>
+            </div>
+          </div>
+
+          {/* Status indicator */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+            hasKey
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+              : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${hasKey ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            {hasKey
+              ? <>AI Advisor connected &mdash; key: <span className="font-mono">{maskedKey}</span></>
+              : <>No API key configured &mdash; get one at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-300">console.anthropic.com</a></>
+            }
+          </div>
+
+          {hasKey && (
+            <button
+              onClick={handleClearKey}
+              className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+            >
+              Remove API key
+            </button>
+          )}
+
+          <p className="text-[10px] text-white/25 leading-relaxed">
+            Your key is only stored in this browser&apos;s localStorage. It&apos;s sent to the server only to authenticate API calls to Anthropic — we never store it server-side. Each team member manages their own key and usage.
+          </p>
+        </div>
+      </SectionCard>
+
       {/* Profile Summary */}
       <SectionCard title="Account" icon={<User className="w-4 h-4 text-teal-400" />}>
         <div className="flex items-center justify-between">

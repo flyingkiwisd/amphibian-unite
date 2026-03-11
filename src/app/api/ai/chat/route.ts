@@ -33,6 +33,7 @@ interface ChatRequest {
     [key: string]: unknown;
   };
   conversationHistory?: { role: 'user' | 'assistant'; content: string }[];
+  apiKey?: string; // Per-user API key (takes precedence over env var)
 }
 
 // ── Rate limiting (simple in-memory) ─────────────────────────────────────────
@@ -171,27 +172,27 @@ Your core principles:
 
 export async function POST(request: NextRequest) {
   try {
-    // Check for API key
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    // Parse request
+    const body: ChatRequest = await request.json();
+    const { message, memberId, context, conversationHistory } = body;
+
+    // Resolve API key: per-user key takes precedence, then env var fallback
+    const apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
         {
           error: 'API key not configured',
           message:
-            'The ANTHROPIC_API_KEY environment variable is not set. To enable AI features:\n\n' +
+            'No API key found. To enable your AI advisor:\n\n' +
             '1. Go to console.anthropic.com and create an API key\n' +
-            '2. Add it to your .env.local file: ANTHROPIC_API_KEY=sk-ant-...\n' +
-            '3. Or set it in Vercel: Settings > Environment Variables\n\n' +
-            'Your AI advisor will be ready as soon as the key is configured.',
+            '2. Open Settings → Preferences in Amphibian Unite\n' +
+            '3. Paste your key in the "AI Advisor" section\n\n' +
+            'Each team member uses their own key. Your key is stored locally in your browser.',
           setup: true,
         },
         { status: 503 }
       );
     }
-
-    // Parse request
-    const body: ChatRequest = await request.json();
-    const { message, memberId, context, conversationHistory } = body;
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
