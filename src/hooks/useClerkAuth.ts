@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { resolveTeamMember } from '@/lib/auth';
 
 /**
@@ -8,10 +9,12 @@ import { resolveTeamMember } from '@/lib/auth';
  * - When Clerk is configured: uses Clerk's useUser() to get email → maps to memberId
  * - When Clerk is NOT configured: returns inactive state (app uses profile selector)
  *
- * This hook dynamically imports Clerk to avoid errors when keys aren't set.
+ * This hook safely handles SSR/prerendering by deferring Clerk usage to the client.
  */
 
-const isClerkConfigured = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const isClerkConfigured = typeof window !== 'undefined'
+  ? !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  : !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 interface ClerkAuthResult {
   /** Whether Clerk auth is active (keys configured + user session exists) */
@@ -26,22 +29,72 @@ interface ClerkAuthResult {
   email: string | null;
 }
 
-// We need conditional Clerk usage — only import when keys are present
-let useClerkHook: () => ClerkAuthResult;
+const INACTIVE_STATE: ClerkAuthResult = {
+  isClerkActive: false,
+  clerkMemberId: null,
+  isLoaded: true,
+  displayName: null,
+  email: null,
+};
 
-if (isClerkConfigured) {
-  // Dynamic usage — this module path is resolved at build time
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const clerk = require('@clerk/nextjs');
-  useClerkHook = function useClerkAuthWithClerk(): ClerkAuthResult {
+const LOADING_STATE: ClerkAuthResult = {
+  isClerkActive: true,
+  clerkMemberId: null,
+  isLoaded: false,
+  displayName: null,
+  email: null,
+};
+
+/**
+ * Safe wrapper that uses Clerk only on the client side.
+ * During SSR/prerendering, returns loading state to avoid ClerkProvider errors.
+ */
+export function useClerkAuth(): ClerkAuthResult {
+  const [result, setResult] = useState<ClerkAuthResult>(
+    isClerkConfigured ? LOADING_STATE : INACTIVE_STATE
+  );
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // When Clerk is not configured, always return inactive
+  if (!isClerkConfigured) {
+    return INACTIVE_STATE;
+  }
+
+  // Before mount (SSR/prerender), return loading to avoid useUser() outside provider
+  if (!mounted) {
+    return LOADING_STATE;
+  }
+
+  // On the client, use the actual Clerk hook via the inner component
+  return useClerkAuthClient();
+}
+
+/**
+ * Inner hook that actually calls Clerk's useUser().
+ * Only called on the client after mount, so ClerkProvider is guaranteed.
+ */
+function useClerkAuthClient(): ClerkAuthResult {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const clerk = require('@clerk/nextjs');
     const { isLoaded, isSignedIn, user } = clerk.useUser();
 
     if (!isLoaded) {
-      return { isClerkActive: true, clerkMemberId: null, isLoaded: false, displayName: null, email: null };
+      return LOADING_STATE;
     }
 
     if (!isSignedIn || !user) {
-      return { isClerkActive: true, clerkMemberId: null, isLoaded: true, displayName: null, email: null };
+      return {
+        isClerkActive: true,
+        clerkMemberId: null,
+        isLoaded: true,
+        displayName: null,
+        email: null,
+      };
     }
 
     const email = user.primaryEmailAddress?.emailAddress ?? null;
@@ -55,18 +108,8 @@ if (isClerkConfigured) {
       displayName,
       email,
     };
-  };
-} else {
-  // No Clerk — return inactive state, app uses profile selector
-  useClerkHook = function useClerkAuthWithoutClerk(): ClerkAuthResult {
-    return {
-      isClerkActive: false,
-      clerkMemberId: null,
-      isLoaded: true,
-      displayName: null,
-      email: null,
-    };
-  };
+  } catch {
+    // If Clerk throws (e.g., no provider), fall back gracefully
+    return INACTIVE_STATE;
+  }
 }
-
-export const useClerkAuth = useClerkHook;
