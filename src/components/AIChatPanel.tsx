@@ -440,6 +440,8 @@ export function AIChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const shouldScrollRef = useRef(false);
+  const prevMessageCountRef = useRef(0);
 
   // Check API key status on mount
   useEffect(() => {
@@ -452,13 +454,20 @@ export function AIChatPanel({
   useEffect(() => {
     const loaded = loadMessages(memberId);
     setMessages(loaded);
+    prevMessageCountRef.current = loaded.length;
     if (loaded.length > 0) setShowSuggestions(false);
   }, [memberId]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Only scroll within the chat container (not the page) when a new message arrives
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > prevMessageCountRef.current || isLoading) {
+      shouldScrollRef.current = true;
+    }
+    prevMessageCountRef.current = messages.length;
+
+    if (shouldScrollRef.current && chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      shouldScrollRef.current = false;
     }
   }, [messages, isLoading]);
 

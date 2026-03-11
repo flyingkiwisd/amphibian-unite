@@ -667,49 +667,8 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
         </div>
       </div>
 
-      {/* ════════════ AI Advisor — Daily Coaching ════════════ */}
-      <div className="animate-fade-in" style={{ animationDelay: '50ms' }}>
-        <AIChatPanel
-          memberId={currentUser}
-          memberName={member.name}
-          memberRole={member.role}
-          context={{
-            priorities: todayCommitments.map(
-              (c) => `${c.text} [${c.status}]`
-            ),
-            weeklyGoals: weeklyData.goals.map(
-              (g) => `${g.text} [${g.status}]`
-            ),
-            monthlyGoals: monthlyData.goals.map(
-              (g) => `${g.text} [${g.status}]`
-            ),
-            kpis: personalData.kpis.map(
-              (k) => `${k.text} [${k.status}]${k.notes ? ` — ${k.notes}` : ''}`
-            ),
-            ownership: personalData.ownership.map(
-              (a) => `${a.text} [${a.status}]${a.notes ? ` — ${a.notes}` : ''}`
-            ),
-            okrs: myOkrs.flatMap((okr) =>
-              okr.myKeyResults.map((kr) => `${okr.objective}: ${kr.text} (${kr.progress}%) [${okr.status}]`)
-            ),
-          }}
-          title={`${firstName}, here are some things to consider today`}
-          titleIcon="lightbulb"
-          compact={false}
-          defaultCollapsed={false}
-          suggestedPrompts={[
-            'What should my #1 priority be today and why?',
-            'Where am I most at risk of dropping the ball this week?',
-            'What blind spots should I watch for given my current focus?',
-            'Give me a brutally honest assessment — am I on track?',
-            'What would a $1B CEO do differently in my position today?',
-            'What hard conversation should I be having that I\'m avoiding?',
-          ]}
-        />
-      </div>
-
       {/* ════════════ Section 2: Your Focus (Tabbed) ════════════ */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden animate-fade-in" style={{ animationDelay: '75ms' }}>
+      <div className="bg-surface border border-border rounded-xl overflow-hidden animate-fade-in" style={{ animationDelay: '50ms' }}>
         {/* Tab bar */}
         <div className="flex items-center gap-1 p-2 border-b border-border bg-surface-2/30">
           {[
@@ -1262,6 +1221,47 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
         </div>
       </div>
 
+      {/* ════════════ AI Advisor — Daily Coaching ════════════ */}
+      <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+        <AIChatPanel
+          memberId={currentUser}
+          memberName={member.name}
+          memberRole={member.role}
+          context={{
+            priorities: todayCommitments.map(
+              (c) => `${c.text} [${c.status}]`
+            ),
+            weeklyGoals: weeklyData.goals.map(
+              (g) => `${g.text} [${g.status}]`
+            ),
+            monthlyGoals: monthlyData.goals.map(
+              (g) => `${g.text} [${g.status}]`
+            ),
+            kpis: personalData.kpis.map(
+              (k) => `${k.text} [${k.status}]${k.notes ? ` — ${k.notes}` : ''}`
+            ),
+            ownership: personalData.ownership.map(
+              (a) => `${a.text} [${a.status}]${a.notes ? ` — ${a.notes}` : ''}`
+            ),
+            okrs: myOkrs.flatMap((okr) =>
+              okr.myKeyResults.map((kr) => `${okr.objective}: ${kr.text} (${kr.progress}%) [${okr.status}]`)
+            ),
+          }}
+          title={`${firstName}, here are some things to consider today`}
+          titleIcon="lightbulb"
+          compact={false}
+          defaultCollapsed={false}
+          suggestedPrompts={[
+            'What should my #1 priority be today and why?',
+            'Where am I most at risk of dropping the ball this week?',
+            'What blind spots should I watch for given my current focus?',
+            'Give me a brutally honest assessment — am I on track?',
+            'What would a $1B CEO do differently in my position today?',
+            'What hard conversation should I be having that I\'m avoiding?',
+          ]}
+        />
+      </div>
+
       {/* ════════════ Section 3: Your KPIs ════════════ */}
       <div className="animate-fade-in" style={{ animationDelay: '150ms' }}>
         <div className="flex items-center justify-between mb-4">
@@ -1456,7 +1456,7 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
         </div>
       </div>
 
-      {/* AI Advisor moved to top of dashboard (after hero) */}
+      {/* AI Advisor placed after Focus section (priorities first) */}
     </div>
   );
 }
