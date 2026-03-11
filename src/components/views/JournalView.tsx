@@ -4,7 +4,8 @@ import { useState, useMemo } from 'react';
 import {
   Sun, Moon, CalendarDays, TrendingUp, ChevronDown, ChevronRight,
   Check, Circle, Sparkles, BookOpen, Target, AlertTriangle, Heart,
-  RotateCcw, Flame, Brain,
+  RotateCcw, Flame, Brain, Trophy, Send, Lock, MessageCircle,
+  Lightbulb, TrendingDown, Zap, Award,
 } from 'lucide-react';
 import { memberIdToOwnerName } from '@/lib/data';
 import { getTeamMemberOS } from '@/lib/teamOS';
@@ -34,6 +35,10 @@ interface JournalEntry {
   gratitude: string;
   notes: string;
   createdAt: string;
+  // New fields
+  winOfTheDay: string;
+  publishedAt?: string; // ISO timestamp when published
+  dailyPromptResponse: string;
 }
 
 interface JournalData {
@@ -43,14 +48,243 @@ interface JournalData {
 }
 
 // ---------------------------------------------------------------------------
+// Daily Firm Prompts (30+ strategic CEO/fund management prompts)
+// ---------------------------------------------------------------------------
+const DAILY_PROMPTS: string[] = [
+  "How can we think about improving risk-adjusted alpha today?",
+  "What's the single most leveraged thing I can do today?",
+  "Which LP relationship needs the most attention right now?",
+  "What process is slowing us down that could be automated?",
+  "Where are we not being bold enough?",
+  "What would a $1B AUM firm do differently today?",
+  "Who on the team needs support or recognition?",
+  "What's one thing I should stop doing?",
+  "What's the biggest risk in our portfolio right now that we're not discussing?",
+  "If I could only accomplish one thing this week, what would move the needle most?",
+  "Which relationship — LP, co-investor, or advisor — could unlock the next level?",
+  "What decision am I avoiding that I know needs to be made?",
+  "Where is our process creating drag instead of leverage?",
+  "What would I tell a new CEO in my seat to focus on first?",
+  "Are we spending time on the right deals, or just the loudest ones?",
+  "What's the one metric I should obsess over this quarter?",
+  "How well are we communicating our thesis to LPs and prospects?",
+  "What talent gap, if filled, would 2x our output?",
+  "Where am I confusing activity with progress?",
+  "What's our unfair advantage and are we leaning into it enough?",
+  "What feedback have I received recently that I haven't acted on?",
+  "Which portfolio company needs a difficult conversation?",
+  "How can we create more optionality in our pipeline?",
+  "What's one experiment we could run this week that costs almost nothing?",
+  "Am I delegating enough, or am I the bottleneck?",
+  "What would our top LP say if they saw how we spent today?",
+  "Where are we leaving alpha on the table through inaction?",
+  "What's the next capability we need to build as a firm?",
+  "How healthy is our deal pipeline for the next 6 months?",
+  "What would break if I took a week off — and does that concern me?",
+  "Are we tracking the right KPIs, or just the easy ones?",
+  "What's the most important thing I can teach the team this week?",
+  "Where should we be contrarian when the market is consensus?",
+  "What's one thing I learned this week that changes how I think?",
+  "How aligned is the team on our top 3 priorities?",
+  "What's the cost of the status quo if we change nothing?",
+  "Which emerging trend or theme should we be researching deeper?",
+  "How can I make my direct reports more effective today?",
+  "What's one partnership or collaboration we should explore?",
+  "If we had unlimited capital, what would we do differently — and why aren't we doing some of that now?",
+];
+
+function getDailyPrompt(): string {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - start.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return DAILY_PROMPTS[dayOfYear % DAILY_PROMPTS.length];
+}
+
+// ---------------------------------------------------------------------------
+// AI Theme Analysis helpers
+// ---------------------------------------------------------------------------
+const THEME_KEYWORDS: Record<string, string[]> = {
+  'Team Alignment': ['team', 'alignment', 'aligned', 'culture', 'together', 'collaboration', 'collaborate'],
+  'LP Focus': ['lp', 'investor', 'fundraise', 'fundraising', 'capital', 'relationship', 'relationships'],
+  'Hiring': ['hire', 'hiring', 'recruit', 'talent', 'candidate', 'interview', 'onboard'],
+  'Strategy': ['strategy', 'strategic', 'thesis', 'vision', 'roadmap', 'plan', 'planning'],
+  'Deals & Pipeline': ['deal', 'deals', 'pipeline', 'sourcing', 'diligence', 'underwriting'],
+  'Portfolio': ['portfolio', 'company', 'companies', 'founder', 'founders', 'board'],
+  'Risk': ['risk', 'downside', 'hedge', 'exposure', 'volatility', 'drawdown'],
+  'Growth': ['growth', 'scale', 'scaling', 'expand', 'expansion', 'revenue', 'aum'],
+  'Process': ['process', 'automation', 'automate', 'systems', 'workflow', 'efficiency'],
+  'Ownership': ['ownership', 'accountability', 'responsible', 'own', 'leader', 'leadership'],
+  'Focus': ['focus', 'prioritize', 'priority', 'priorities', 'leverage', 'leveraged'],
+  'Communication': ['communicate', 'communication', 'update', 'reporting', 'transparency'],
+  'Learning': ['learn', 'learning', 'research', 'study', 'read', 'insight', 'insights'],
+  'Energy & Wellness': ['energy', 'health', 'wellness', 'rest', 'burnout', 'balance', 'exercise'],
+  'Decision Making': ['decision', 'decide', 'choice', 'tradeoff', 'conviction'],
+};
+
+interface ThemeCount {
+  theme: string;
+  count: number;
+}
+
+function analyzeThemes(entries: JournalEntry[]): ThemeCount[] {
+  const counts: Record<string, number> = {};
+
+  for (const entry of entries) {
+    const allText = [
+      ...entry.reflections,
+      ...entry.wins,
+      entry.gratitude,
+      entry.notes,
+      entry.winOfTheDay ?? '',
+      entry.dailyPromptResponse ?? '',
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    for (const [theme, keywords] of Object.entries(THEME_KEYWORDS)) {
+      for (const kw of keywords) {
+        const regex = new RegExp(`\\b${kw}\\b`, 'gi');
+        const matches = allText.match(regex);
+        if (matches) {
+          counts[theme] = (counts[theme] ?? 0) + matches.length;
+        }
+      }
+    }
+  }
+
+  return Object.entries(counts)
+    .map(([theme, count]) => ({ theme, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+interface AIFeedbackMessage {
+  icon: typeof TrendingUp;
+  iconColor: string;
+  message: string;
+}
+
+function generateAIFeedback(
+  entries: JournalEntry[],
+  themes: ThemeCount[]
+): AIFeedbackMessage[] {
+  const feedback: AIFeedbackMessage[] = [];
+  if (entries.length === 0) return feedback;
+
+  // Mood analysis
+  const moodOrder: Record<string, number> = { great: 5, good: 4, neutral: 3, tough: 2, rough: 1 };
+  const moodsThisWeek = entries.filter((e) => e.mood).map((e) => moodOrder[e.mood!] ?? 3);
+  if (moodsThisWeek.length >= 3) {
+    const avgMood = moodsThisWeek.reduce((a, b) => a + b, 0) / moodsThisWeek.length;
+    if (avgMood >= 4) {
+      feedback.push({
+        icon: Flame,
+        iconColor: 'text-emerald-400',
+        message: `Strong energy this week! You've maintained positive momentum across ${moodsThisWeek.length} entries.`,
+      });
+    } else if (avgMood <= 2.5) {
+      feedback.push({
+        icon: TrendingDown,
+        iconColor: 'text-amber-400',
+        message: "Mood has been lower than usual. Consider what's driving that and whether you need to reset.",
+      });
+    }
+  }
+
+  // Energy analysis
+  const energies = entries.filter((e) => e.energy).map((e) => e.energy!);
+  if (energies.length >= 3) {
+    const avgEnergy = energies.reduce((a, b) => a + b, 0) / energies.length;
+    if (avgEnergy <= 2.5) {
+      feedback.push({
+        icon: Zap,
+        iconColor: 'text-rose-400',
+        message: "Energy levels have dipped — consider what's driving that. Sleep, workload, or something else?",
+      });
+    } else if (avgEnergy >= 4) {
+      feedback.push({
+        icon: Zap,
+        iconColor: 'text-emerald-400',
+        message: `High energy levels averaging ${avgEnergy.toFixed(1)}/5. You're in a good operating zone.`,
+      });
+    }
+  }
+
+  // Checklist completion analysis
+  const checklistEntries = entries.filter((e) => e.checklist.length > 0);
+  if (checklistEntries.length >= 3) {
+    const totalItems = checklistEntries.reduce((sum, e) => sum + e.checklist.length, 0);
+    const checkedItems = checklistEntries.reduce(
+      (sum, e) => sum + e.checklist.filter((c) => c.checked).length,
+      0
+    );
+    const pct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
+    if (pct >= 80) {
+      feedback.push({
+        icon: Target,
+        iconColor: 'text-accent',
+        message: `Your morning routine consistency is excellent — ${pct}% completion this week.`,
+      });
+    } else if (pct < 50 && pct > 0) {
+      feedback.push({
+        icon: Target,
+        iconColor: 'text-amber-400',
+        message: `Checklist completion is at ${pct}%. Consider simplifying your routine or identifying blockers.`,
+      });
+    }
+  }
+
+  // Theme-based feedback
+  if (themes.length > 0) {
+    const top = themes[0];
+    if (top.count >= 3) {
+      feedback.push({
+        icon: Brain,
+        iconColor: 'text-indigo-400',
+        message: `You've mentioned "${top.theme}" ${top.count} times recently. This seems like a core focus area.`,
+      });
+    }
+    if (themes.length >= 2 && themes[1].count >= 2) {
+      feedback.push({
+        icon: Lightbulb,
+        iconColor: 'text-amber-400',
+        message: `Secondary theme: "${themes[1].theme}" (${themes[1].count} mentions). Consider how this connects to your main focus.`,
+      });
+    }
+  }
+
+  // Win of the day tracking
+  const winsOfDay = entries.filter((e) => (e.winOfTheDay ?? '').trim().length > 0);
+  if (winsOfDay.length >= 5) {
+    feedback.push({
+      icon: Trophy,
+      iconColor: 'text-amber-400',
+      message: `You've logged ${winsOfDay.length} daily wins recently. Consistent win tracking builds momentum.`,
+    });
+  }
+
+  // Gratitude tracking
+  const gratitudes = entries.filter((e) => (e.gratitude ?? '').trim().length > 0);
+  if (gratitudes.length >= 5) {
+    feedback.push({
+      icon: Heart,
+      iconColor: 'text-rose-400',
+      message: `Gratitude practice is strong — ${gratitudes.length} entries. Research shows this compounds over time.`,
+    });
+  }
+
+  return feedback;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 const moodConfig: Record<Mood, { emoji: string; label: string; color: string }> = {
-  great: { emoji: '🔥', label: 'Great', color: 'text-emerald-400' },
-  good: { emoji: '✨', label: 'Good', color: 'text-accent' },
-  neutral: { emoji: '😐', label: 'Neutral', color: 'text-text-secondary' },
-  tough: { emoji: '💪', label: 'Tough', color: 'text-amber-400' },
-  rough: { emoji: '🌧', label: 'Rough', color: 'text-rose-400' },
+  great: { emoji: '\u{1F525}', label: 'Great', color: 'text-emerald-400' },
+  good: { emoji: '\u2728', label: 'Good', color: 'text-accent' },
+  neutral: { emoji: '\u{1F610}', label: 'Neutral', color: 'text-text-secondary' },
+  tough: { emoji: '\u{1F4AA}', label: 'Tough', color: 'text-amber-400' },
+  rough: { emoji: '\u{1F327}', label: 'Rough', color: 'text-rose-400' },
 };
 
 const energyLabels = ['', 'Low', 'Below Avg', 'Normal', 'High', 'Peak'];
@@ -62,6 +296,11 @@ function todayISO(): string {
 function formatDate(iso: string): string {
   const d = new Date(iso + 'T12:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function formatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 function makeId(): string {
@@ -84,6 +323,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
   const [activeTab, setActiveTab] = useState<EntryType>('morning');
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
+  const [aiTimeRange, setAiTimeRange] = useState<7 | 14 | 30>(7);
 
   // Find today's entry for the active tab
   const todayEntry = useMemo(
@@ -140,6 +380,19 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
     return { mornings, eods, weeklys, total: thisWeek.length, avgMood };
   }, [journal.entries]);
 
+  // AI Analysis: theme analysis across recent entries
+  const aiAnalysis = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - aiTimeRange);
+    const cutoffISO = cutoff.toISOString().split('T')[0];
+
+    const recentEntries = journal.entries.filter((e) => e.date >= cutoffISO);
+    const themes = analyzeThemes(recentEntries);
+    const feedback = generateAIFeedback(recentEntries, themes);
+
+    return { themes, feedback, entryCount: recentEntries.length };
+  }, [journal.entries, aiTimeRange]);
+
   // Create or update today's entry
   function createTodayEntry(): JournalEntry {
     return {
@@ -154,6 +407,9 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
       gratitude: '',
       notes: '',
       createdAt: new Date().toISOString(),
+      winOfTheDay: '',
+      publishedAt: undefined,
+      dailyPromptResponse: '',
     };
   }
 
@@ -216,6 +472,21 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
     updateEntry(entryId, (e) => ({ ...e, notes: value }));
   }
 
+  function setWinOfTheDay(entryId: string, value: string) {
+    updateEntry(entryId, (e) => ({ ...e, winOfTheDay: value }));
+  }
+
+  function setDailyPromptResponse(entryId: string, value: string) {
+    updateEntry(entryId, (e) => ({ ...e, dailyPromptResponse: value }));
+  }
+
+  function publishEntry(entryId: string) {
+    updateEntry(entryId, (e) => ({
+      ...e,
+      publishedAt: new Date().toISOString(),
+    }));
+  }
+
   function toggleExpanded(id: string) {
     setExpandedEntries((prev) => {
       const next = new Set(prev);
@@ -237,6 +508,8 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
     ? activeEntry.checklist.filter((c) => c.checked).length
     : 0;
   const checklistTotal = activeEntry ? activeEntry.checklist.length : defaultChecklist.length;
+
+  const dailyPrompt = getDailyPrompt();
 
   // ---------------------------------------------------------------------------
   // Render
@@ -312,7 +585,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
             <span className="text-xs text-text-muted">Avg Mood</span>
           </div>
           <p className="text-lg font-bold text-foreground">
-            {stats.avgMood > 0 ? stats.avgMood.toFixed(1) : '—'}<span className="text-xs text-text-muted font-normal">/5</span>
+            {stats.avgMood > 0 ? stats.avgMood.toFixed(1) : '\u2014'}<span className="text-xs text-text-muted font-normal">/5</span>
           </p>
         </div>
       </div>
@@ -355,7 +628,14 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
             <span className="text-sm font-semibold text-foreground">
               {activeTab === 'morning' ? 'Morning Check-In' : activeTab === 'eod' ? 'End of Day Reflection' : 'Weekly Pulse'}
             </span>
-            <span className="text-xs text-text-muted">— {formatDate(today)}</span>
+            <span className="text-xs text-text-muted">&mdash; {formatDate(today)}</span>
+            {/* Published badge */}
+            {activeEntry?.publishedAt && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-semibold text-emerald-400">
+                <Lock size={9} />
+                Published &#10003; {formatTimestamp(activeEntry.publishedAt)}
+              </span>
+            )}
           </div>
           {!activeEntry && (
             <button
@@ -369,6 +649,29 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
 
         {activeEntry ? (
           <div className="p-5 space-y-6">
+            {/* ============================================================= */}
+            {/* FEATURE 5: QUESTION OF THE DAY — Daily Firm Prompt */}
+            {/* ============================================================= */}
+            <div className="relative overflow-hidden rounded-xl bg-teal-500/5 border border-teal-500/25 p-4">
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/8 to-transparent" />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageCircle size={14} className="text-teal-400" />
+                  <p className="text-[10px] text-teal-400/80 font-bold uppercase tracking-widest">Question of the Day</p>
+                </div>
+                <p className="text-sm font-semibold text-teal-300 mb-3 leading-relaxed">
+                  {dailyPrompt}
+                </p>
+                <textarea
+                  value={activeEntry.dailyPromptResponse ?? ''}
+                  onChange={(e) => setDailyPromptResponse(activeEntry.id, e.target.value)}
+                  placeholder="Your response..."
+                  rows={2}
+                  className="w-full bg-teal-500/5 border border-teal-500/20 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-teal-400/30 focus:border-teal-400/40 focus:ring-1 focus:ring-teal-400/20 outline-none resize-none transition-colors"
+                />
+              </div>
+            </div>
+
             {/* Mood & Energy */}
             <div className="flex flex-wrap gap-4">
               {/* Mood selector */}
@@ -422,6 +725,27 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                     <span className="text-[10px] text-text-muted self-center ml-1">{energyLabels[activeEntry.energy]}</span>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* ============================================================= */}
+            {/* FEATURE 2: WIN OF THE DAY */}
+            {/* ============================================================= */}
+            <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/8 to-transparent" />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <Trophy size={16} className="text-amber-400" />
+                  <p className="text-xs text-amber-400/90 font-bold uppercase tracking-widest">Win of the Day</p>
+                </div>
+                <p className="text-[10px] text-amber-400/50 mb-2">What&apos;s your single biggest win today?</p>
+                <textarea
+                  value={activeEntry.winOfTheDay ?? ''}
+                  onChange={(e) => setWinOfTheDay(activeEntry.id, e.target.value)}
+                  placeholder="My biggest win today..."
+                  rows={2}
+                  className="w-full bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2.5 text-[15px] font-medium text-foreground placeholder:text-amber-400/30 focus:border-amber-400/40 focus:ring-1 focus:ring-amber-400/20 outline-none resize-none transition-colors"
+                />
               </div>
             </div>
 
@@ -552,6 +876,27 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-text-muted/50 focus:border-accent/40 focus:ring-1 focus:ring-accent/20 outline-none resize-none transition-colors"
               />
             </div>
+
+            {/* ============================================================= */}
+            {/* FEATURE 1: PUBLISH BUTTON */}
+            {/* ============================================================= */}
+            <div className="pt-2">
+              {activeEntry.publishedAt ? (
+                <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+                  <Lock size={14} />
+                  <span className="text-sm font-semibold">Published &#10003;</span>
+                  <span className="text-xs text-emerald-400/60">&mdash; {formatTimestamp(activeEntry.publishedAt)}</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => publishEntry(activeEntry.id)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-accent/80 via-accent-blue/80 to-accent-purple/80 hover:from-accent hover:via-accent-blue hover:to-accent-purple text-white font-semibold text-sm border border-accent/30 transition-all duration-300 hover:shadow-lg hover:shadow-accent/20"
+                >
+                  <Send size={14} />
+                  Publish Entry
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           /* Empty state */
@@ -575,6 +920,119 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
             </button>
           </div>
         )}
+      </div>
+
+      {/* ============================================================= */}
+      {/* FEATURE 3 & 4: AI INSIGHTS & FEEDBACK */}
+      {/* ============================================================= */}
+      <div className="rounded-xl bg-indigo-500/5 border border-indigo-500/20 overflow-hidden">
+        <div className="px-5 py-4 border-b border-indigo-500/15 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles size={15} className="text-indigo-400" />
+            <span className="text-sm font-semibold text-foreground">AI Insights</span>
+            <span className="text-[10px] text-indigo-400/60 px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 font-medium">
+              {aiAnalysis.entryCount} entries analyzed
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {([7, 14, 30] as const).map((days) => (
+              <button
+                key={days}
+                onClick={() => setAiTimeRange(days)}
+                className={`px-2.5 py-1 text-[10px] font-semibold rounded-lg border transition-all ${
+                  aiTimeRange === days
+                    ? 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
+                    : 'bg-white/3 border-white/10 text-text-muted hover:bg-white/8'
+                }`}
+              >
+                {days}d
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Theme chips */}
+          {aiAnalysis.themes.length > 0 ? (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Brain size={13} className="text-indigo-400" />
+                <p className="text-xs text-text-muted font-semibold uppercase tracking-wider">Recurring Themes</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {aiAnalysis.themes.slice(0, 10).map(({ theme, count }) => (
+                  <span
+                    key={theme}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-medium text-indigo-300"
+                  >
+                    {theme}
+                    <span className="text-[10px] text-indigo-400/60 bg-indigo-500/15 px-1.5 py-0.5 rounded-full font-bold">
+                      {count}
+                    </span>
+                  </span>
+                ))}
+              </div>
+              {/* Theme Trends */}
+              {aiAnalysis.themes.length > 0 && (
+                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-500/8 border border-indigo-500/15">
+                  <TrendingUp size={12} className="text-indigo-400 flex-shrink-0" />
+                  <p className="text-xs text-indigo-300/80">
+                    <span className="font-semibold text-indigo-300">Theme Trends:</span>{' '}
+                    {aiTimeRange <= 7 ? 'This week' : aiTimeRange <= 14 ? 'Past two weeks' : 'This month'} you focused most on{' '}
+                    <span className="font-bold text-indigo-200">{aiAnalysis.themes[0].theme}</span>
+                    {aiAnalysis.themes.length > 1 && (
+                      <>
+                        {' '}followed by{' '}
+                        <span className="font-bold text-indigo-200">{aiAnalysis.themes[1].theme}</span>
+                      </>
+                    )}
+                    .
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <Brain size={20} className="mx-auto text-indigo-400/30 mb-2" />
+              <p className="text-xs text-text-muted">
+                Start journaling to see AI-powered theme analysis. Themes are extracted from your reflections, wins, notes, and prompts.
+              </p>
+            </div>
+          )}
+
+          {/* AI Feedback messages */}
+          {aiAnalysis.feedback.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Award size={13} className="text-indigo-400" />
+                <p className="text-xs text-text-muted font-semibold uppercase tracking-wider">AI Coach Feedback</p>
+              </div>
+              <div className="space-y-2">
+                {aiAnalysis.feedback.map((fb, i) => {
+                  const FBIcon = fb.icon;
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 px-4 py-3 rounded-xl bg-white/3 border border-white/8 hover:bg-white/5 transition-colors"
+                    >
+                      <FBIcon size={14} className={`${fb.iconColor} flex-shrink-0 mt-0.5`} />
+                      <p className="text-sm text-text-secondary leading-relaxed">{fb.message}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {aiAnalysis.feedback.length === 0 && aiAnalysis.themes.length > 0 && (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-white/3 border border-white/8">
+              <Lightbulb size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-text-secondary leading-relaxed">
+                Keep journaling consistently to unlock personalized coaching feedback. The AI coach analyzes mood, energy, checklist completion, and themes across your entries.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Commitments & Decision Filter (from TeamOS) */}
@@ -635,7 +1093,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                 const isExpanded = expandedEntries.has(entry.id);
                 const completed = entry.checklist.filter((c) => c.checked).length;
                 const total = entry.checklist.length;
-                const { emoji } = entry.mood ? moodConfig[entry.mood] : { emoji: '📝' };
+                const { emoji } = entry.mood ? moodConfig[entry.mood] : { emoji: '\u{1F4DD}' };
 
                 return (
                   <div key={entry.id}>
@@ -650,19 +1108,47 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                             {entry.type === 'morning' ? 'Morning' : entry.type === 'eod' ? 'EOD' : 'Weekly'}
                           </span>
                           <span className="text-xs text-text-muted">{formatDate(entry.date)}</span>
+                          {entry.publishedAt && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-semibold text-emerald-400">
+                              <Lock size={7} />
+                              Published
+                            </span>
+                          )}
                         </div>
                         {total > 0 && (
                           <span className="text-[10px] text-text-muted">{completed}/{total} checked</span>
                         )}
                       </div>
                       {entry.energy && (
-                        <span className="text-xs text-accent/60">⚡{entry.energy}</span>
+                        <span className="text-xs text-accent/60">&#9889;{entry.energy}</span>
                       )}
                       {isExpanded ? <ChevronDown size={12} className="text-text-muted" /> : <ChevronRight size={12} className="text-text-muted" />}
                     </button>
 
                     {isExpanded && (
                       <div className="px-5 pb-4 space-y-3">
+                        {/* Win of the Day in history */}
+                        {(entry.winOfTheDay ?? '').trim() && (
+                          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                            <Trophy size={12} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-[10px] text-amber-400/70 uppercase tracking-wider font-semibold mb-0.5">Win of the Day</p>
+                              <p className="text-xs text-amber-300/90">{entry.winOfTheDay}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Daily prompt response in history */}
+                        {(entry.dailyPromptResponse ?? '').trim() && (
+                          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-teal-500/5 border border-teal-500/15">
+                            <MessageCircle size={12} className="text-teal-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-semibold mb-0.5">Daily Prompt Response</p>
+                              <p className="text-xs text-teal-300/90">{entry.dailyPromptResponse}</p>
+                            </div>
+                          </div>
+                        )}
+
                         {entry.checklist.length > 0 && (
                           <div className="space-y-1">
                             {entry.checklist.map((item) => (
@@ -683,7 +1169,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                           <div>
                             <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Wins</p>
                             {entry.wins.filter(Boolean).map((w, i) => (
-                              <p key={i} className="text-xs text-text-secondary">• {w}</p>
+                              <p key={i} className="text-xs text-text-secondary">&bull; {w}</p>
                             ))}
                           </div>
                         )}

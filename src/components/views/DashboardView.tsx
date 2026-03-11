@@ -207,6 +207,7 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
   // ── Accountability data (shared store) ──
   const [acctData, setAcctData] = useState<MemberAccountabilityData>({});
   const [newCommitment, setNewCommitment] = useState('');
+  const [editingCommitmentId, setEditingCommitmentId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -281,6 +282,26 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
     entries[idx] = { ...entries[idx], commitments: entries[idx].commitments.filter((c) => c.id !== commitmentId) };
     next[currentUser] = { entries };
     saveAcctData(next);
+  };
+
+  const updateCommitmentText = (commitmentId: string, newText: string) => {
+    if (!newText.trim()) {
+      setEditingCommitmentId(null);
+      return;
+    }
+    const next = { ...acctData };
+    const entries = [...(next[currentUser]?.entries ?? [])];
+    const idx = entries.findIndex((e) => e.date === todayDate);
+    if (idx < 0) return;
+    entries[idx] = {
+      ...entries[idx],
+      commitments: entries[idx].commitments.map((c) =>
+        c.id === commitmentId ? { ...c, text: newText.trim() } : c
+      ),
+    };
+    next[currentUser] = { entries };
+    saveAcctData(next);
+    setEditingCommitmentId(null);
   };
 
   // ── Editable personal data (KPIs + Ownership) ──
@@ -411,9 +432,28 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
                     <button onClick={() => cycleStatus(c.id)} className="flex-shrink-0 hover:scale-110 transition-transform">
                       {commitStatusIcon(c.status)}
                     </button>
-                    <span className={`flex-1 text-sm ${c.status === 'completed' ? 'text-text-muted line-through' : 'text-text-primary'}`}>
-                      {c.text}
-                    </span>
+                    {editingCommitmentId === c.id ? (
+                      <input
+                        autoFocus
+                        defaultValue={c.text}
+                        className="flex-1 bg-white/5 border border-accent/30 rounded-md px-2 py-1 text-sm text-text-primary outline-none focus:border-accent/60 transition-colors"
+                        onBlur={(e) => updateCommitmentText(c.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') updateCommitmentText(c.id, e.currentTarget.value);
+                          if (e.key === 'Escape') setEditingCommitmentId(null);
+                        }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => setEditingCommitmentId(c.id)}
+                        className={`flex-1 text-sm cursor-text hover:bg-white/5 rounded-md px-2 py-1 -mx-2 transition-colors ${
+                          c.status === 'completed' ? 'text-text-muted line-through' : 'text-text-primary'
+                        }`}
+                        title="Click to edit"
+                      >
+                        {c.text}
+                      </span>
+                    )}
                     <button
                       onClick={() => removeCommitment(c.id)}
                       className="p-1 text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-rose-400 transition-all"

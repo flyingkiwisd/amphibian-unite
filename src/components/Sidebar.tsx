@@ -14,7 +14,7 @@ import {
   StickyNote,
   Search,
   DollarSign,
-  HeartPulse,
+  Trophy,
   BookOpen,
   Settings,
 } from 'lucide-react';
@@ -44,7 +44,7 @@ const navItems: { label: string; icon: React.ElementType; view: ViewType; group:
   { label: 'Notes', icon: StickyNote, view: 'notes', group: 2 },
   { label: 'Roadmap', icon: Map, view: 'roadmap', group: 2 },
   { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway', group: 2 },
-  { label: 'LP Health', icon: HeartPulse, view: 'lp-health', group: 2 },
+  { label: 'Leaderboard', icon: Trophy, view: 'leaderboard', group: 2 },
   { label: 'Settings', icon: Settings, view: 'settings', group: 2 },
 ];
 

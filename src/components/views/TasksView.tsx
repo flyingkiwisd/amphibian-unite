@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { exportToPdf } from '@/lib/exportPdf';
 import { memberIdToOwnerName } from '@/lib/data';
 import {
@@ -17,6 +17,8 @@ import {
   GripVertical,
   ArrowUpDown,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   X,
   Trash2,
   Edit3,
@@ -38,6 +40,13 @@ type FilterType = 'all' | 'mine' | 'todo' | 'in-progress' | 'done';
 type ViewMode = 'list' | 'kanban';
 type SortField = 'title' | 'owner' | 'priority' | 'deadline' | 'category';
 type SortDirection = 'asc' | 'desc';
+type DateFilterType = 'all' | 'overdue' | 'this-week' | 'this-month' | 'specific';
+
+interface DateFilter {
+  type: DateFilterType;
+  date?: Date; // only used when type === 'specific'
+  label: string;
+}
 
 // ── Pre-populated tasks (90-day action plan) ───────────────
 
@@ -98,6 +107,250 @@ const categoryColors: Record<string, string> = {
 const owners = ['James', 'Ross', 'Ty', 'Andrew', 'Timon', 'Sahir', 'Todd', 'Paola', 'Mark', 'David', 'Thao'];
 const categories = ['BTC Alpha', 'Dynamic Alpha', 'SMA', 'Capital', 'Hiring', 'Data', 'Governance', 'AI Edge'];
 const priorities: Task['priority'][] = ['critical', 'high', 'medium', 'low'];
+
+const MONTH_ABBRS: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+/** Convert deadline strings like "Mar 15", "Apr 30" to Date objects (year 2026). Returns null for "Ongoing", "TBD", etc. */
+function parseDeadlineDate(deadline: string): Date | null {
+  const parts = deadline.trim().split(/\s+/);
+  if (parts.length !== 2) return null;
+  const monthIdx = MONTH_ABBRS[parts[0]];
+  const day = parseInt(parts[1], 10);
+  if (monthIdx === undefined || isNaN(day)) return null;
+  return new Date(2026, monthIdx, day);
+}
+
+/** Check if two dates are the same calendar day */
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** Get start of week (Sunday) for a given date */
+function getStartOfWeek(d: Date): Date {
+  const result = new Date(d);
+  result.setDate(result.getDate() - result.getDay());
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+/** Get end of week (Saturday) for a given date */
+function getEndOfWeek(d: Date): Date {
+  const result = getStartOfWeek(d);
+  result.setDate(result.getDate() + 6);
+  result.setHours(23, 59, 59, 999);
+  return result;
+}
+
+/** Format a Date as a short label like "Mar 15, 2026" */
+function formatDateLabel(d: Date): string {
+  const abbr = Object.entries(MONTH_ABBRS).find(([, v]) => v === d.getMonth())?.[0] ?? '';
+  return `${abbr} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+// ── Calendar Dropdown ───────────────────────────────────────
+
+function CalendarDropdown({
+  tasks,
+  dateFilter,
+  onDateFilterChange,
+  onClose,
+}: {
+  tasks: Task[];
+  dateFilter: DateFilter;
+  onDateFilterChange: (filter: DateFilter) => void;
+  onClose: () => void;
+}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  // Collect all task deadline dates for dot indicators
+  const deadlineDates = new Set<string>();
+  tasks.forEach((t) => {
+    const d = parseDeadlineDate(t.deadline);
+    if (d) deadlineDates.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+  });
+
+  const hasDeadline = (year: number, month: number, day: number) =>
+    deadlineDates.has(`${year}-${month}-${day}`);
+
+  // Build calendar grid
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+  const calendarDays: { day: number; month: number; year: number; isCurrentMonth: boolean }[] = [];
+
+  // Previous month trailing days
+  for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+    const prevMonth = viewMonth === 0 ? 11 : viewMonth - 1;
+    const prevYear = viewMonth === 0 ? viewYear - 1 : viewYear;
+    calendarDays.push({ day: daysInPrevMonth - i, month: prevMonth, year: prevYear, isCurrentMonth: false });
+  }
+
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    calendarDays.push({ day: d, month: viewMonth, year: viewYear, isCurrentMonth: true });
+  }
+
+  // Next month leading days to fill 6 rows
+  const remaining = 42 - calendarDays.length;
+  for (let d = 1; d <= remaining; d++) {
+    const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1;
+    const nextYear = viewMonth === 11 ? viewYear + 1 : viewYear;
+    calendarDays.push({ day: d, month: nextMonth, year: nextYear, isCurrentMonth: false });
+  }
+
+  const navigateMonth = (delta: number) => {
+    let newMonth = viewMonth + delta;
+    let newYear = viewYear;
+    if (newMonth < 0) { newMonth = 11; newYear--; }
+    if (newMonth > 11) { newMonth = 0; newYear++; }
+    setViewMonth(newMonth);
+    setViewYear(newYear);
+  };
+
+  const handleDayClick = (day: number, month: number, year: number) => {
+    const selectedDate = new Date(year, month, day);
+    selectedDate.setHours(0, 0, 0, 0);
+    onDateFilterChange({ type: 'specific', date: selectedDate, label: formatDateLabel(selectedDate) });
+    onClose();
+  };
+
+  const handleQuickFilter = (type: DateFilterType) => {
+    switch (type) {
+      case 'all':
+        onDateFilterChange({ type: 'all', label: 'All Dates' });
+        break;
+      case 'overdue':
+        onDateFilterChange({ type: 'overdue', label: 'Overdue' });
+        break;
+      case 'this-week':
+        onDateFilterChange({ type: 'this-week', label: 'This Week' });
+        break;
+      case 'this-month':
+        onDateFilterChange({ type: 'this-month', label: 'This Month' });
+        break;
+    }
+    onClose();
+  };
+
+  const isSelected = (day: number, month: number, year: number) => {
+    if (dateFilter.type !== 'specific' || !dateFilter.date) return false;
+    return dateFilter.date.getFullYear() === year && dateFilter.date.getMonth() === month && dateFilter.date.getDate() === day;
+  };
+
+  const isToday = (day: number, month: number, year: number) =>
+    today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="absolute top-full right-0 mt-2 z-50 w-[300px] bg-surface border border-border rounded-xl shadow-2xl shadow-black/30 animate-fade-in overflow-hidden"
+    >
+      {/* Month navigation */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <button
+          onClick={() => navigateMonth(-1)}
+          className="p-1 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-primary transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-semibold text-text-primary">
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button
+          onClick={() => navigateMonth(1)}
+          className="p-1 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-primary transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 px-3 pt-3 pb-1">
+        {DAY_LABELS.map((label) => (
+          <div key={label} className="text-center text-[10px] font-semibold text-text-muted uppercase tracking-wider">
+            {label}
+          </div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div className="grid grid-cols-7 px-3 pb-3">
+        {calendarDays.map((cd, idx) => {
+          const dayIsToday = isToday(cd.day, cd.month, cd.year);
+          const dayIsSelected = isSelected(cd.day, cd.month, cd.year);
+          const dayHasDeadline = hasDeadline(cd.year, cd.month, cd.day);
+
+          return (
+            <button
+              key={idx}
+              onClick={() => handleDayClick(cd.day, cd.month, cd.year)}
+              className={`
+                relative flex flex-col items-center justify-center h-9 rounded-lg text-xs font-medium transition-all duration-150
+                ${!cd.isCurrentMonth ? 'text-text-muted/30' : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'}
+                ${dayIsToday ? 'bg-accent/15 text-accent font-bold ring-1 ring-accent/30' : ''}
+                ${dayIsSelected ? 'bg-accent text-white font-bold shadow-lg shadow-accent/20 ring-0' : ''}
+              `}
+            >
+              {cd.day}
+              {dayHasDeadline && cd.isCurrentMonth && (
+                <span className={`absolute bottom-0.5 w-1 h-1 rounded-full ${dayIsSelected ? 'bg-white' : 'bg-accent'}`} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Quick filters */}
+      <div className="border-t border-border px-3 py-2.5 flex flex-wrap gap-1.5">
+        {([
+          { type: 'all' as DateFilterType, label: 'All Dates' },
+          { type: 'overdue' as DateFilterType, label: 'Overdue' },
+          { type: 'this-week' as DateFilterType, label: 'This Week' },
+          { type: 'this-month' as DateFilterType, label: 'This Month' },
+        ]).map((qf) => (
+          <button
+            key={qf.type}
+            onClick={() => handleQuickFilter(qf.type)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all duration-200 ${
+              dateFilter.type === qf.type
+                ? 'bg-accent text-white shadow-sm shadow-accent/20'
+                : 'bg-surface-3 text-text-muted hover:text-text-secondary hover:bg-surface-2'
+            }`}
+          >
+            {qf.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ── Task Modal ──────────────────────────────────────────────
 
@@ -249,7 +502,14 @@ export function TasksView({ currentUser }: { currentUser?: string }) {
   const [sortField, setSortField] = useState<SortField>('priority');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [modalTask, setModalTask] = useState<Task | null | 'new'>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'all', label: 'All Dates' });
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarBtnRef = useRef<HTMLDivElement>(null);
   const dragItem = useRef<string | null>(null);
+
+  const handleDateFilterChange = useCallback((newFilter: DateFilter) => {
+    setDateFilter(newFilter);
+  }, []);
 
   // Counts
   const counts = {
@@ -260,12 +520,44 @@ export function TasksView({ currentUser }: { currentUser?: string }) {
     done: tasks.filter((t) => t.status === 'done').length,
   };
 
-  // Filtered tasks
-  const filteredTasks = filter === 'all'
+  // Filtered tasks (status filter)
+  const statusFiltered = filter === 'all'
     ? tasks
     : filter === 'mine'
       ? tasks.filter((t) => t.owner === ownerName)
       : tasks.filter((t) => t.status === filter);
+
+  // Date filter
+  const filteredTasks = dateFilter.type === 'all'
+    ? statusFiltered
+    : statusFiltered.filter((t) => {
+        const taskDate = parseDeadlineDate(t.deadline);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        switch (dateFilter.type) {
+          case 'specific': {
+            if (!taskDate || !dateFilter.date) return false;
+            return isSameDay(taskDate, dateFilter.date);
+          }
+          case 'overdue': {
+            if (!taskDate) return false;
+            return taskDate < today && t.status !== 'done';
+          }
+          case 'this-week': {
+            if (!taskDate) return false;
+            const weekStart = getStartOfWeek(today);
+            const weekEnd = getEndOfWeek(today);
+            return taskDate >= weekStart && taskDate <= weekEnd;
+          }
+          case 'this-month': {
+            if (!taskDate) return false;
+            return taskDate.getFullYear() === today.getFullYear() && taskDate.getMonth() === today.getMonth();
+          }
+          default:
+            return true;
+        }
+      });
 
   // Sorted tasks
   const sortedTasks = [...filteredTasks].sort((a, b) => {
@@ -417,6 +709,46 @@ export function TasksView({ currentUser }: { currentUser?: string }) {
               Kanban
             </button>
           </div>
+
+          {/* Calendar date filter */}
+          <div ref={calendarBtnRef} className="relative">
+            <button
+              onClick={() => setCalendarOpen((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                calendarOpen || dateFilter.type !== 'all'
+                  ? 'bg-accent/15 text-accent border-accent/30'
+                  : 'bg-surface-3 text-text-muted hover:text-text-secondary hover:bg-surface-2 border-border'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Dates
+              {dateFilter.type !== 'all' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+              )}
+            </button>
+            {calendarOpen && (
+              <CalendarDropdown
+                tasks={tasks}
+                dateFilter={dateFilter}
+                onDateFilterChange={handleDateFilterChange}
+                onClose={() => setCalendarOpen(false)}
+              />
+            )}
+          </div>
+
+          {/* Active date filter chip */}
+          {dateFilter.type !== 'all' && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-accent/10 text-accent border border-accent/20">
+              <Calendar className="w-3 h-3" />
+              {dateFilter.label}
+              <button
+                onClick={() => setDateFilter({ type: 'all', label: 'All Dates' })}
+                className="ml-0.5 p-0.5 rounded hover:bg-accent/20 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
           <div className="w-px h-6 bg-border mx-1" />
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { agents as defaultAgents, memberIdToOwnerName } from '@/lib/data';
 import type { Agent } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
@@ -27,6 +27,7 @@ import {
   Download,
   Plus,
   Trash2,
+  Send,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -173,6 +174,96 @@ function getAgentActivity(agentId: string) {
   ];
 }
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'agent';
+  text: string;
+  timestamp: number;
+}
+
+function generateAgentResponse(agent: Agent, userMessage: string): string {
+  const msg = userMessage.toLowerCase();
+  const name = agent.name;
+  const caps = agent.capabilities;
+  const sources = agent.dataSourcesConnected;
+
+  // Agent-specific hard-coded responses
+  const agentSpecific: Record<string, Record<string, string>> = {
+    'north-star': {
+      status: `Current AUM tracking at $85M with a North Star target of $1B+. Edge rating sits at 5.1/10 — we're monitoring daily for strategic inflection points. All ${sources.length} data sources feeding live.`,
+      capabilities: `I'm built to keep the team locked on the $1B+ North Star. My capabilities include: ${caps.join(', ')}. I pull from ${sources.join(', ')} to maintain real-time alignment scoring.`,
+      risk: `Key risk factors: Edge rating at 5.1/10 suggests room for improvement. AUM gap to target remains significant at ~$915M. Monitoring macro headwinds and LP sentiment shifts that could impact trajectory.`,
+      data: `Connected to ${sources.length} sources: ${sources.join(', ')}. All feeds operational. AUM data refreshes every 6 hours, edge rating recalculates daily.`,
+      report: `North Star Brief: AUM $85M (8.5% of $1B target). Edge rating 5.1/10. ${sources.length} data sources connected and live. Weekly alignment report generated 3 days ago. Priority: critical.`,
+    },
+    'task-commander': {
+      status: `14 active tasks in the pipeline. Team velocity is tracking well — 3 tasks auto-assigned in the last 4 hours. 2 overdue items flagged for review. Connected to ${sources.join(', ')}.`,
+      capabilities: `I manage the full task lifecycle. Capabilities: ${caps.join(', ')}. I sync with ${sources.join(', ')} to keep everything organized and moving.`,
+      risk: `2 overdue tasks need attention — potential bottleneck risk. Team load distribution looks uneven; recommending rebalance. No blocked dependencies detected.`,
+      data: `Data pipeline: ${sources.join(', ')}. Task sync runs every 2 hours. Last sync pulled 12 tasks. All connections healthy.`,
+      report: `Task Commander Brief: 14 active tasks, 2 overdue, 3 recently auto-assigned. Team velocity trending up 12% WoW. ${sources.length} data sources connected. Priority: high.`,
+    },
+    'portfolio-intel': {
+      status: `Portfolio scan complete across 8 positions. BTC correlation shift detected 5 hours ago — monitoring closely. Risk-adjusted returns updated. Pulling from ${sources.join(', ')}.`,
+      capabilities: `I provide deep portfolio intelligence. Capabilities: ${caps.join(', ')}. Sourcing data from ${sources.join(', ')} for comprehensive analysis.`,
+      risk: `Alert: BTC correlation shift detected — this could impact 3 portfolio positions. Recommend reviewing hedge exposure. Risk-adjusted returns are within tolerance but trending toward the boundary.`,
+      data: `Connected to ${sources.length} sources: ${sources.join(', ')}. Position data refreshes every 2 hours. Correlation models recalculate on new market data.`,
+      report: `Portfolio Intel Brief: 8 positions scanned, BTC correlation shift flagged, risk-adjusted returns updated. ${sources.length} data sources live. Recommend hedge review this week.`,
+    },
+    'financial': {
+      status: `Runway at 18 months. Q1 expenses tracking under budget by 4.2%. Cash flow forecast updated 2 days ago. Connected to ${sources.join(', ')}.`,
+      capabilities: `I handle financial intelligence end-to-end. Capabilities: ${caps.join(', ')}. Data flows from ${sources.join(', ')}.`,
+      risk: `Runway is healthy at 18 months but sensitive to AUM growth rate. Q1 burn rate is under control. Watch item: upcoming infrastructure costs could tighten margins in Q2.`,
+      data: `Data sources: ${sources.join(', ')}. Expense data reconciles daily. Runway projections update weekly. All feeds green.`,
+      report: `Financial Brief: Runway 18 months, Q1 expenses 4.2% under budget. Cash flow positive. ${sources.length} sources connected. No immediate concerns — Q2 infra costs worth monitoring.`,
+    },
+    'lp-trust': {
+      status: `LP satisfaction trending positive. March update prepared 3 hours ago. 1 LP contact flagged as overdue for outreach. Tracking via ${sources.join(', ')}.`,
+      capabilities: `I manage LP relationships and trust-building. Capabilities: ${caps.join(', ')}. Data from ${sources.join(', ')}.`,
+      risk: `LP #4 contact is overdue — recommend outreach within 48 hours. Overall satisfaction is stable but 2 LPs showed decreased engagement last quarter. Proactive communication recommended.`,
+      data: `Connected to ${sources.join(', ')}. LP interaction logs update in real-time. Satisfaction scoring recalculates monthly. ${sources.length} sources all operational.`,
+      report: `LP Trust Brief: Overall satisfaction positive, March update ready, 1 overdue contact flagged. Outreach cadence on track for 4 of 5 LPs. ${sources.length} data sources connected.`,
+    },
+    'slack-signal': {
+      status: `Processed 47 Slack messages in the last hour. 3 action items extracted from #strategy. 1 alignment issue flagged in #product. Connected to ${sources.join(', ')}.`,
+      capabilities: `I monitor Slack for signals that matter. Capabilities: ${caps.join(', ')}. Pulling from ${sources.join(', ')}.`,
+      risk: `Alignment issue detected in #product channel — may indicate team misalignment on roadmap priorities. Recommend sync meeting. Action item completion rate is 78% — 22% are stale.`,
+      data: `Sources: ${sources.join(', ')}. Message processing is real-time. Action item extraction uses keyword and context matching. ${sources.length} feeds active.`,
+      report: `Slack Signal Brief: 47 messages processed, 3 action items extracted, 1 alignment flag raised. Signal-to-noise ratio healthy. ${sources.length} sources connected.`,
+    },
+  };
+
+  const specific = agentSpecific[agent.id];
+
+  if (specific) {
+    if (/status|update|how/.test(msg)) return specific.status;
+    if (/help|capabilities|what can/.test(msg)) return specific.capabilities;
+    if (/risk|concern|issue/.test(msg)) return specific.risk;
+    if (/data|source|connect/.test(msg)) return specific.data;
+    if (/report|summary|brief/.test(msg)) return specific.report;
+  }
+
+  // Generic keyword-based fallbacks for agents without specific responses
+  if (/status|update|how/.test(msg)) {
+    return `${name} is ${agent.status === 'active' ? 'online and operational' : 'currently in ' + agent.status + ' phase'}. Connected to ${sources.length} data source${sources.length !== 1 ? 's' : ''}: ${sources.length > 0 ? sources.join(', ') : 'none yet'}. All systems nominal.`;
+  }
+  if (/help|capabilities|what can/.test(msg)) {
+    return `Here's what I can do:\n${caps.map((c) => '- ' + c).join('\n')}\n\nI'm powered by ${sources.length} data source${sources.length !== 1 ? 's' : ''} and continuously improving.`;
+  }
+  if (/risk|concern|issue/.test(msg)) {
+    return `Based on my current data from ${sources.length} source${sources.length !== 1 ? 's' : ''}, I'm monitoring for risks across my domain. ${agent.status === 'active' ? 'No critical alerts at this time, but I recommend regular review cycles.' : 'Full risk analysis will be available once I\'m fully active.'}`;
+  }
+  if (/data|source|connect/.test(msg)) {
+    return `I'm connected to ${sources.length} data source${sources.length !== 1 ? 's' : ''}${sources.length > 0 ? ': ' + sources.join(', ') : ''}. ${sources.length >= 4 ? 'Strong coverage across my domain.' : sources.length > 0 ? 'Additional sources would improve my analysis.' : 'No sources connected yet — this is a priority.'}`;
+  }
+  if (/report|summary|brief/.test(msg)) {
+    return `${name} Summary: Status is ${agent.status}, priority ${agent.priority}. ${caps.length} capabilities active, ${sources.length} data sources connected. ${agent.status === 'active' ? 'Operating within normal parameters.' : 'Full reporting available once active.'}`;
+  }
+
+  // Default catch-all
+  return `I'm ${name}, and I'm here to help. I have ${caps.length} capabilities and access to ${sources.length} data source${sources.length !== 1 ? 's' : ''}. Try asking me about my status, capabilities, risks, data sources, or for a summary report.`;
+}
+
 export function AgentsView({ currentUser }: { currentUser?: string }) {
   const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? currentUser : null;
 
@@ -183,6 +274,10 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showMyAgentsOnly, setShowMyAgentsOnly] = useState(false);
+  const [agentChats, setAgentChats] = useState<Record<string, ChatMessage[]>>({});
+  const [agentPrompt, setAgentPrompt] = useState('');
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const selectedAgent = selectedAgentId ? agentsData.find((a) => a.id === selectedAgentId) || null : null;
 
   const activeCount = agentsData.filter((a) => a.status === 'active').length;
@@ -232,6 +327,48 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
   const deleteAgent = (id: string) => {
     if (selectedAgentId === id) setSelectedAgentId(null);
     setAgents((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  // Auto-scroll chat to bottom when messages change or typing indicator appears
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [agentChats, isAgentTyping]);
+
+  const handleAgentMessage = (agent: Agent) => {
+    const text = agentPrompt.trim();
+    if (!text || agent.status !== 'active') return;
+
+    const userMsg: ChatMessage = {
+      id: `msg-${Date.now()}-user`,
+      role: 'user',
+      text,
+      timestamp: Date.now(),
+    };
+
+    setAgentChats((prev) => ({
+      ...prev,
+      [agent.id]: [...(prev[agent.id] || []), userMsg],
+    }));
+    setAgentPrompt('');
+    setIsAgentTyping(true);
+
+    const delay = 800 + Math.random() * 1200; // 0.8–2s
+    setTimeout(() => {
+      const responseText = generateAgentResponse(agent, text);
+      const agentMsg: ChatMessage = {
+        id: `msg-${Date.now()}-agent`,
+        role: 'agent',
+        text: responseText,
+        timestamp: Date.now(),
+      };
+      setAgentChats((prev) => ({
+        ...prev,
+        [agent.id]: [...(prev[agent.id] || []), agentMsg],
+      }));
+      setIsAgentTyping(false);
+    }, delay);
   };
 
   return (
@@ -532,38 +669,89 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
                     </div>
                   </div>
 
-                  {/* Talk to Agent (Future - Prompt Interface) */}
+                  {/* Talk to Agent — Chat Interface */}
                   <div>
                     <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
                       Talk to Agent
                     </h3>
                     <div className="bg-surface-2 rounded-xl border border-border p-4">
+                      {/* Online/Offline indicator */}
                       <div className="flex items-center gap-2 mb-3">
                         <div className={`w-2 h-2 rounded-full ${selectedAgent.status === 'active' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
                         <span className="text-xs text-text-muted">
                           {selectedAgent.status === 'active' ? 'Agent online — ready to assist' : 'Agent offline — coming soon'}
                         </span>
                       </div>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder={selectedAgent.status === 'active' ? `Ask ${selectedAgent.shortName} Agent...` : 'Coming soon with Claude API integration'}
-                          disabled={selectedAgent.status !== 'active'}
-                          className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50 disabled:opacity-40 disabled:cursor-not-allowed"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && selectedAgent.status === 'active') {
-                              const input = e.currentTarget;
-                              if (input.value.trim()) {
-                                input.value = '';
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      {selectedAgent.status !== 'active' && (
-                        <p className="text-[10px] text-text-muted/60 mt-2 italic">
-                          Phase 3: Agents become interactive via Claude API
-                        </p>
+
+                      {selectedAgent.status === 'active' ? (
+                        <>
+                          {/* Messages area */}
+                          <div
+                            ref={chatScrollRef}
+                            className="max-h-[300px] overflow-y-auto space-y-3 mb-3 scroll-smooth"
+                          >
+                            {(!agentChats[selectedAgent.id] || agentChats[selectedAgent.id].length === 0) && !isAgentTyping && (
+                              <p className="text-xs text-text-muted/60 text-center py-6 italic">
+                                Ask me anything about {selectedAgent.name}
+                              </p>
+                            )}
+                            {(agentChats[selectedAgent.id] || []).map((msg) => (
+                              <div
+                                key={msg.id}
+                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                              >
+                                <div
+                                  className={`max-w-[85%] text-sm whitespace-pre-wrap ${
+                                    msg.role === 'user'
+                                      ? 'bg-accent/20 text-text-primary border border-accent/30 rounded-xl px-3 py-2'
+                                      : 'bg-surface border border-border rounded-xl px-3 py-2'
+                                  }`}
+                                >
+                                  {msg.text}
+                                </div>
+                              </div>
+                            ))}
+                            {isAgentTyping && (
+                              <div className="flex justify-start">
+                                <div className="bg-surface border border-border rounded-xl px-3 py-2 text-sm text-text-muted italic">
+                                  Thinking...
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Input + Send button */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={agentPrompt}
+                              onChange={(e) => setAgentPrompt(e.target.value)}
+                              placeholder={`Ask ${selectedAgent.shortName} Agent...`}
+                              className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !isAgentTyping) {
+                                  handleAgentMessage(selectedAgent);
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => handleAgentMessage(selectedAgent)}
+                              disabled={!agentPrompt.trim() || isAgentTyping}
+                              className="bg-accent/20 text-accent rounded-lg px-3 py-2.5 hover:bg-accent/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            placeholder="Coming soon..."
+                            disabled
+                            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                          />
+                        </>
                       )}
                     </div>
                   </div>

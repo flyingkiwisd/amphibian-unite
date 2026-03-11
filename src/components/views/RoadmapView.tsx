@@ -16,78 +16,136 @@ import {
 import { roadmapPhases, memberIdToOwnerName } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
 import { useEditableStore } from '@/lib/useEditableStore';
-import { InlineText, InlineSelect, EditBanner } from '@/components/InlineEdit';
+import { InlineText, InlineSelect, InlineList, EditBanner } from '@/components/InlineEdit';
 
-const aumMilestones = [
-  { label: '$80-100M', revenue: '$1.6-2M', position: 0, isCurrent: true },
-  { label: '$200M', revenue: '$3-4M', position: 25, isCurrent: false },
-  { label: '$400M', revenue: '$5-8M', position: 50, isCurrent: false },
-  { label: '$750M', revenue: '$10-15M', position: 75, isCurrent: false },
-  { label: '$1B+', revenue: '$20-30M+', position: 100, isCurrent: false },
-];
+/* ── Types ── */
 
-const trajectoryData = [
-  {
-    timeline: 'Today',
-    aum: '$80-100M',
-    revenue: '$1.6-2M',
-    edge: '5.1/10',
-    team: '14',
-    different: 'Proving BTC Alpha. Hiring COO + CTO. Building AI edge foundation.',
-  },
-  {
-    timeline: 'Dec 2026',
-    aum: '$150-200M',
-    revenue: '$3-4M',
-    edge: '6.5/10',
-    team: '16-18',
-    different: 'Dynamic Alpha live. COO running ops. Regime classifier v1.',
-  },
-  {
-    timeline: 'Dec 2027',
-    aum: '$250-400M',
-    revenue: '$5-8M',
-    edge: '7.5/10',
-    team: '20-22',
-    different: 'Institutional governance. AI Fund Ops product launched.',
-  },
-  {
-    timeline: 'Dec 2028',
-    aum: '$500-750M',
-    revenue: '$10-15M',
-    edge: '8.0/10',
-    team: '25-30',
-    different: '20+ managers. Multiple revenue lines. Full AI stack.',
-  },
-  {
-    timeline: '2030',
-    aum: '$1B+',
-    revenue: '$20-30M+',
-    edge: '8.5/10',
-    team: '30-40',
-    different: 'Multi-asset digital finance platform. The Bridge complete.',
-  },
-];
+interface AumMilestone {
+  label: string;
+  revenue: string;
+  position: number;
+  isCurrent: boolean;
+}
 
-const proveItActions = [
-  'BTC Alpha: hit 20 bps/month consistently',
-  'Map all 12 BTC yield sources with bps attribution',
-  'Hire COO by June 2026',
-  'CTO candidates identified by April 2026',
-  'A9 audit underway and risk framework documented',
-  'Dynamic Alpha: name + structure + sleeve architecture finalized',
-  'Risk dashboard v1 deployed',
-  'Regime classifier v0.1: architecture + data sources defined',
-];
+interface TrajectoryRow {
+  timeline: string;
+  aum: string;
+  revenue: string;
+  edge: string;
+  team: string;
+  different: string;
+}
 
-const ninetyDayGate = [
-  'BTC Alpha > 15 bps/month average over 90 days',
-  'COO offer extended or hired',
-  'CTO search actively engaged with 3+ candidates',
-  'Dynamic Alpha structure approved by IC',
-  'Risk limits published with 100% breach logging',
-  'Strategy performance database operational',
-];
+interface RoadmapPhase {
+  phase: string;
+  when: string;
+  edge: string;
+  description: string;
+  status: string;
+}
+
+interface RoadmapData {
+  headerTitle: string;
+  headerSubtitle: string;
+  aumMilestones: AumMilestone[];
+  trajectoryData: TrajectoryRow[];
+  phases: RoadmapPhase[];
+  proveItActions: string[];
+  ninetyDayGate: string[];
+  roleMessages: Record<string, string>;
+}
+
+/* ── Default Data ── */
+
+const defaultRoadmapData: RoadmapData = {
+  headerTitle: 'The $1B+ Roadmap',
+  headerSubtitle: 'Path from $100M to $1B+ AUM \u2014 every phase has clear milestones and edge targets',
+  aumMilestones: [
+    { label: '$80-100M', revenue: '$1.6-2M', position: 0, isCurrent: true },
+    { label: '$200M', revenue: '$3-4M', position: 25, isCurrent: false },
+    { label: '$400M', revenue: '$5-8M', position: 50, isCurrent: false },
+    { label: '$750M', revenue: '$10-15M', position: 75, isCurrent: false },
+    { label: '$1B+', revenue: '$20-30M+', position: 100, isCurrent: false },
+  ],
+  trajectoryData: [
+    {
+      timeline: 'Today',
+      aum: '$80-100M',
+      revenue: '$1.6-2M',
+      edge: '5.1/10',
+      team: '14',
+      different: 'Proving BTC Alpha. Hiring COO + CTO. Building AI edge foundation.',
+    },
+    {
+      timeline: 'Dec 2026',
+      aum: '$150-200M',
+      revenue: '$3-4M',
+      edge: '6.5/10',
+      team: '16-18',
+      different: 'Dynamic Alpha live. COO running ops. Regime classifier v1.',
+    },
+    {
+      timeline: 'Dec 2027',
+      aum: '$250-400M',
+      revenue: '$5-8M',
+      edge: '7.5/10',
+      team: '20-22',
+      different: 'Institutional governance. AI Fund Ops product launched.',
+    },
+    {
+      timeline: 'Dec 2028',
+      aum: '$500-750M',
+      revenue: '$10-15M',
+      edge: '8.0/10',
+      team: '25-30',
+      different: '20+ managers. Multiple revenue lines. Full AI stack.',
+    },
+    {
+      timeline: '2030',
+      aum: '$1B+',
+      revenue: '$20-30M+',
+      edge: '8.5/10',
+      team: '30-40',
+      different: 'Multi-asset digital finance platform. The Bridge complete.',
+    },
+  ],
+  phases: roadmapPhases.map((p) => ({ ...p })),
+  proveItActions: [
+    'BTC Alpha: hit 20 bps/month consistently',
+    'Map all 12 BTC yield sources with bps attribution',
+    'Hire COO by June 2026',
+    'CTO candidates identified by April 2026',
+    'A9 audit underway and risk framework documented',
+    'Dynamic Alpha: name + structure + sleeve architecture finalized',
+    'Risk dashboard v1 deployed',
+    'Regime classifier v0.1: architecture + data sources defined',
+  ],
+  ninetyDayGate: [
+    'BTC Alpha > 15 bps/month average over 90 days',
+    'COO offer extended or hired',
+    'CTO search actively engaged with 3+ candidates',
+    'Dynamic Alpha structure approved by IC',
+    'Risk limits published with 100% breach logging',
+    'Strategy performance database operational',
+  ],
+  roleMessages: {
+    james: 'You own the vision and $1B trajectory',
+    ty: 'You own portfolio edge and risk governance',
+    timon: 'You own the AI stack and platform',
+    mark: 'You own financial clarity and runway',
+    todd: 'You own LP trust and IR',
+    ross: 'You own cross-functional execution and portfolio ops',
+    paola: 'You own partnerships and growth pipeline',
+    andrew: 'You own competitive intel and governance',
+    sahir: 'You own strategy performance and operations',
+    david: 'You own fund administration and operations',
+    thao: 'You own project coordination and task management',
+    nicole: 'You support investor relations and communications',
+    nick: 'You support fund operations and reporting',
+  },
+};
+
+/* ── Static lookup data (non-editable) ── */
 
 const statusOptions = [
   { label: 'Active', value: 'active', color: 'bg-accent/15 text-accent border border-accent/30' },
@@ -95,71 +153,95 @@ const statusOptions = [
   { label: 'Future', value: 'future', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
 ];
 
-const roadmapRoleMessages: Record<string, string> = {
-  james: 'You own the vision and $1B trajectory',
-  ty: 'You own portfolio edge and risk governance',
-  timon: 'You own the AI stack and platform',
-  mark: 'You own financial clarity and runway',
-  todd: 'You own LP trust and IR',
-  ross: 'You own cross-functional execution and portfolio ops',
-  paola: 'You own partnerships and growth pipeline',
-  andrew: 'You own competitive intel and governance',
-  sahir: 'You own strategy performance and operations',
-  david: 'You own fund administration and operations',
-  thao: 'You own project coordination and task management',
-  nicole: 'You support investor relations and communications',
-  nick: 'You support fund operations and reporting',
-};
-
 const proveItActionOwners: Record<number, string[]> = {
-  0: ['ty', 'ross'],           // BTC Alpha: hit 20 bps/month
-  1: ['ross', 'ty'],           // Map all 12 BTC yield sources
-  2: ['james'],                // Hire COO by June 2026
-  3: ['james'],                // CTO candidates identified
-  4: ['ross', 'ty'],           // A9 audit underway
-  5: ['james', 'andrew'],      // Dynamic Alpha: name + structure
-  6: ['timon', 'ty'],          // Risk dashboard v1 deployed
-  7: ['timon', 'sahir'],       // Regime classifier v0.1
+  0: ['ty', 'ross'],
+  1: ['ross', 'ty'],
+  2: ['james'],
+  3: ['james'],
+  4: ['ross', 'ty'],
+  5: ['james', 'andrew'],
+  6: ['timon', 'ty'],
+  7: ['timon', 'sahir'],
 };
 
 const ninetyDayGateOwners: Record<number, string[]> = {
-  0: ['ty', 'ross'],           // BTC Alpha > 15 bps/month
-  1: ['james'],                // COO offer extended
-  2: ['james'],                // CTO search engaged
-  3: ['james', 'andrew', 'ty'],// Dynamic Alpha structure approved
-  4: ['ty', 'timon'],          // Risk limits published
-  5: ['sahir', 'timon'],       // Strategy performance database
+  0: ['ty', 'ross'],
+  1: ['james'],
+  2: ['james'],
+  3: ['james', 'andrew', 'ty'],
+  4: ['ty', 'timon'],
+  5: ['sahir', 'timon'],
 };
+
+/* ── Component ── */
 
 export function RoadmapView({ currentUser }: { currentUser?: string }) {
   const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? currentUser : null;
 
-  const { data: phases, setData: setPhases, hasEdits, resetAll } = useEditableStore(
+  const { data, setData, hasEdits, resetAll } = useEditableStore(
     'amphibian-unite-roadmap',
-    roadmapPhases
+    defaultRoadmapData,
   );
 
+  /* ── Update helpers ── */
+
+  const updateField = <K extends keyof RoadmapData>(field: K, value: RoadmapData[K]) => {
+    setData((prev) => ({ ...prev, [field]: value }));
+  };
+
   const updatePhase = (index: number, field: string, value: string) => {
-    setPhases((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
-    );
+    setData((prev) => ({
+      ...prev,
+      phases: prev.phases.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
+    }));
   };
 
   const addPhase = () => {
-    setPhases((prev) => [
+    setData((prev) => ({
       ...prev,
-      {
-        phase: 'NEW PHASE',
-        when: 'TBD',
-        edge: '0.0',
-        description: 'Click to edit description...',
-        status: 'upcoming' as const,
-      },
-    ]);
+      phases: [
+        ...prev.phases,
+        {
+          phase: 'NEW PHASE',
+          when: 'TBD',
+          edge: '0.0',
+          description: 'Click to edit description...',
+          status: 'upcoming',
+        },
+      ],
+    }));
   };
 
   const deletePhase = (index: number) => {
-    setPhases((prev) => prev.filter((_, i) => i !== index));
+    setData((prev) => ({
+      ...prev,
+      phases: prev.phases.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateMilestone = (index: number, field: keyof AumMilestone, value: string) => {
+    setData((prev) => ({
+      ...prev,
+      aumMilestones: prev.aumMilestones.map((ms, i) =>
+        i === index ? { ...ms, [field]: value } : ms,
+      ),
+    }));
+  };
+
+  const updateTrajectory = (index: number, field: keyof TrajectoryRow, value: string) => {
+    setData((prev) => ({
+      ...prev,
+      trajectoryData: prev.trajectoryData.map((row, i) =>
+        i === index ? { ...row, [field]: value } : row,
+      ),
+    }));
+  };
+
+  const updateRoleMessage = (userId: string, value: string) => {
+    setData((prev) => ({
+      ...prev,
+      roleMessages: { ...prev.roleMessages, [userId]: value },
+    }));
   };
 
   return (
@@ -172,16 +254,23 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
         <div className="flex items-center gap-3 mb-2">
           <Map className="w-8 h-8 text-accent" />
           <h1 className="text-3xl font-bold gradient-text tracking-tight">
-            The $1B+ Roadmap
+            <InlineText
+              value={data.headerTitle}
+              onSave={(v) => updateField('headerTitle', v)}
+            />
           </h1>
         </div>
         <p className="text-text-secondary text-base max-w-2xl">
-          Path from $100M to $1B+ AUM &mdash; every phase has clear milestones and edge targets
+          <InlineText
+            value={data.headerSubtitle}
+            onSave={(v) => updateField('headerSubtitle', v)}
+            multiline
+          />
         </p>
       </div>
 
       {/* ── Personal Roadmap Summary ── */}
-      {currentUser && roadmapRoleMessages[currentUser] && (
+      {currentUser && data.roleMessages[currentUser] && (
         <div
           className="border-l-4 border-l-accent bg-accent/5 rounded-xl p-5 animate-fade-in"
           style={{ animationDelay: '50ms' }}
@@ -194,7 +283,11 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
             <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
           </div>
           <p className="text-base text-accent font-medium ml-8">
-            {ownerName} &mdash; {roadmapRoleMessages[currentUser]}
+            {ownerName} &mdash;{' '}
+            <InlineText
+              value={data.roleMessages[currentUser]}
+              onSave={(v) => updateRoleMessage(currentUser, v)}
+            />
           </p>
         </div>
       )}
@@ -236,7 +329,7 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
           />
 
           {/* Milestone dots and labels */}
-          {aumMilestones.map((ms, i) => (
+          {data.aumMilestones.map((ms, i) => (
             <div
               key={i}
               className="absolute"
@@ -264,7 +357,10 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
                     ms.isCurrent ? 'text-accent' : 'text-text-secondary'
                   }`}
                 >
-                  {ms.label}
+                  <InlineText
+                    value={ms.label}
+                    onSave={(v) => updateMilestone(i, 'label', v)}
+                  />
                 </span>
                 {ms.isCurrent && (
                   <span className="block text-[10px] font-semibold uppercase tracking-wider text-accent mt-0.5">
@@ -276,7 +372,10 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
               {/* Revenue Label (below) */}
               <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
                 <span className="text-xs text-text-muted font-mono">
-                  {ms.revenue}
+                  <InlineText
+                    value={ms.revenue}
+                    onSave={(v) => updateMilestone(i, 'revenue', v)}
+                  />
                 </span>
                 <span className="block text-[10px] text-text-muted mt-0.5">
                   rev/yr
@@ -310,7 +409,7 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
           <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-border-2" />
 
           <div className="space-y-5">
-            {phases.map((phase, index) => {
+            {data.phases.map((phase, index) => {
               const isActive = phase.status === 'active';
 
               return (
@@ -409,32 +508,12 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
                               Key Actions
                             </h4>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {proveItActions.map((action, i) => {
-                              const isOwned = currentUser ? (proveItActionOwners[i] || []).includes(currentUser) : false;
-                              return (
-                                <div
-                                  key={i}
-                                  className={`flex items-start gap-2.5 p-2 rounded-lg transition-colors ${
-                                    isOwned
-                                      ? 'border-l-2 border-l-accent bg-accent/5 ring-1 ring-accent/20'
-                                      : 'hover:bg-surface-2'
-                                  }`}
-                                >
-                                  <CheckCircle
-                                    size={14}
-                                    className="mt-0.5 flex-shrink-0 text-accent"
-                                  />
-                                  <span className={`text-sm leading-snug ${isOwned ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
-                                    {action}
-                                  </span>
-                                  {isOwned && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider flex-shrink-0 ml-auto">You</span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
+                          <InlineList
+                            items={data.proveItActions}
+                            onSave={(v) => updateField('proveItActions', v)}
+                            placeholder="Add action..."
+                            icon={<CheckCircle size={14} className="text-accent" />}
+                          />
                         </div>
 
                         {/* 90-Day Gate */}
@@ -446,29 +525,12 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
                             </h4>
                           </div>
                           <div className="bg-surface-2 rounded-xl p-4 border border-border">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                              {ninetyDayGate.map((gate, i) => {
-                                const isOwned = currentUser ? (ninetyDayGateOwners[i] || []).includes(currentUser) : false;
-                                return (
-                                  <div
-                                    key={i}
-                                    className={`flex items-start gap-2.5 ${
-                                      isOwned ? 'border-l-2 border-l-accent bg-accent/5 rounded-lg p-1.5 ring-1 ring-accent/20' : ''
-                                    }`}
-                                  >
-                                    <div className="mt-1 flex-shrink-0">
-                                      <div className="h-2.5 w-2.5 rounded-full border-2 border-accent-amber bg-accent-amber/20" />
-                                    </div>
-                                    <span className={`text-sm leading-snug ${isOwned ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
-                                      {gate}
-                                    </span>
-                                    {isOwned && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider flex-shrink-0 ml-auto">You</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            <InlineList
+                              items={data.ninetyDayGate}
+                              onSave={(v) => updateField('ninetyDayGate', v)}
+                              placeholder="Add gate criterion..."
+                              icon={<div className="h-2.5 w-2.5 rounded-full border-2 border-accent-amber bg-accent-amber/20" />}
+                            />
                           </div>
                         </div>
                       </div>
@@ -518,7 +580,7 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
               </tr>
             </thead>
             <tbody>
-              {trajectoryData.map((row, i) => {
+              {data.trajectoryData.map((row, i) => {
                 const isFirst = i === 0;
                 return (
                   <tr
@@ -537,34 +599,52 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
                             isFirst ? 'text-accent' : 'text-text-primary'
                           }`}
                         >
-                          {row.timeline}
+                          <InlineText
+                            value={row.timeline}
+                            onSave={(v) => updateTrajectory(i, 'timeline', v)}
+                          />
                         </span>
                       </div>
                     </td>
                     <td className="py-4 pr-4">
                       <span className="text-sm font-bold text-text-primary whitespace-nowrap">
-                        {row.aum}
+                        <InlineText
+                          value={row.aum}
+                          onSave={(v) => updateTrajectory(i, 'aum', v)}
+                        />
                       </span>
                     </td>
                     <td className="py-4 pr-4">
                       <span className="text-sm font-mono text-text-secondary whitespace-nowrap">
-                        {row.revenue}
+                        <InlineText
+                          value={row.revenue}
+                          onSave={(v) => updateTrajectory(i, 'revenue', v)}
+                        />
                       </span>
                     </td>
                     <td className="py-4 pr-4">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-3 px-2.5 py-1 text-xs font-mono text-text-secondary whitespace-nowrap">
                         <Star size={10} className="text-accent-amber" />
-                        {row.edge}
+                        <InlineText
+                          value={row.edge}
+                          onSave={(v) => updateTrajectory(i, 'edge', v)}
+                        />
                       </span>
                     </td>
                     <td className="py-4 pr-4">
                       <span className="text-sm text-text-secondary font-mono whitespace-nowrap">
-                        {row.team}
+                        <InlineText
+                          value={row.team}
+                          onSave={(v) => updateTrajectory(i, 'team', v)}
+                        />
                       </span>
                     </td>
                     <td className="py-4">
                       <span className="text-sm text-text-muted leading-snug">
-                        {row.different}
+                        <InlineText
+                          value={row.different}
+                          onSave={(v) => updateTrajectory(i, 'different', v)}
+                        />
                       </span>
                     </td>
                   </tr>

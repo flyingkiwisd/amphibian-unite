@@ -14,6 +14,8 @@ import {
   XCircle,
   FileText,
   Sparkles,
+  Edit3,
+  Trash2,
 } from 'lucide-react';
 import { memberIdToOwnerName } from '@/lib/data';
 
@@ -227,6 +229,7 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
     decidedBy: ownerName || emptyForm.decidedBy,
   });
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [editingDecisionId, setEditingDecisionId] = useState<string | null>(null);
 
   // ── Counts ──
   const counts = {
@@ -281,25 +284,81 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
     }));
   };
 
-  // ── Submit new decision ──
+  // ── Submit new decision or update existing ──
   const handleSubmit = () => {
     if (!form.title.trim() || !form.rationale.trim()) return;
 
-    const newDecision: Decision = {
-      id: `dec-${String(decisions.length + 1).padStart(3, '0')}`,
-      title: form.title.trim(),
-      description: form.description.trim(),
-      decidedBy: form.decidedBy,
-      rationale: form.rationale.trim(),
-      affected: form.affected.length > 0 ? form.affected : [form.decidedBy],
-      date: new Date().toISOString().split('T')[0],
-      category: form.category,
-      status: 'pending-review',
-    };
+    if (editingDecisionId) {
+      // Update existing decision
+      setDecisions((prev) =>
+        prev.map((d) =>
+          d.id === editingDecisionId
+            ? {
+                ...d,
+                title: form.title.trim(),
+                description: form.description.trim(),
+                decidedBy: form.decidedBy,
+                rationale: form.rationale.trim(),
+                affected: form.affected.length > 0 ? form.affected : [form.decidedBy],
+                category: form.category,
+              }
+            : d
+        )
+      );
+      setEditingDecisionId(null);
+    } else {
+      // Create new decision
+      const newDecision: Decision = {
+        id: `dec-${String(decisions.length + 1).padStart(3, '0')}`,
+        title: form.title.trim(),
+        description: form.description.trim(),
+        decidedBy: form.decidedBy,
+        rationale: form.rationale.trim(),
+        affected: form.affected.length > 0 ? form.affected : [form.decidedBy],
+        date: new Date().toISOString().split('T')[0],
+        category: form.category,
+        status: 'pending-review',
+      };
+      setDecisions((prev) => [newDecision, ...prev]);
+    }
 
-    setDecisions((prev) => [newDecision, ...prev]);
     setForm({ ...emptyForm, decidedBy: ownerName || emptyForm.decidedBy });
     setShowForm(false);
+  };
+
+  // ── Edit existing decision ──
+  const startEditDecision = (decision: Decision) => {
+    setEditingDecisionId(decision.id);
+    setForm({
+      title: decision.title,
+      description: decision.description,
+      category: decision.category,
+      decidedBy: decision.decidedBy,
+      rationale: decision.rationale,
+      affected: [...decision.affected],
+    });
+    setShowForm(true);
+  };
+
+  // ── Delete decision ──
+  const deleteDecision = (id: string) => {
+    setDecisions((prev) => prev.filter((d) => d.id !== id));
+    if (editingDecisionId === id) {
+      setEditingDecisionId(null);
+      setShowForm(false);
+    }
+  };
+
+  // ── Cycle decision status ──
+  const cycleDecisionStatus = (id: string) => {
+    const statusCycle: Decision['status'][] = ['pending-review', 'final', 'reversed'];
+    setDecisions((prev) =>
+      prev.map((d) => {
+        if (d.id !== id) return d;
+        const idx = statusCycle.indexOf(d.status);
+        return { ...d, status: statusCycle[(idx + 1) % statusCycle.length] };
+      })
+    );
   };
 
   // ── Filter buttons ──
@@ -442,7 +501,7 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
         >
           <div className="flex items-center gap-2 mb-1">
             <FileText className="w-5 h-5 text-accent" />
-            <h2 className="text-lg font-semibold text-text-primary">Log New Decision</h2>
+            <h2 className="text-lg font-semibold text-text-primary">{editingDecisionId ? 'Edit Decision' : 'Log New Decision'}</h2>
           </div>
 
           {/* Title */}
@@ -567,6 +626,7 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
             <button
               onClick={() => {
                 setShowForm(false);
+                setEditingDecisionId(null);
                 setForm({ ...emptyForm, decidedBy: ownerName || emptyForm.decidedBy });
               }}
               className="px-4 py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-2 border border-border transition-all duration-200"
@@ -579,7 +639,7 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
               className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent-2 transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               <CheckCircle className="w-4 h-4" />
-              Submit Decision
+              {editingDecisionId ? 'Save Changes' : 'Submit Decision'}
             </button>
           </div>
         </div>
@@ -616,13 +676,15 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
                       >
                         {catConf.label}
                       </span>
-                      {/* Status badge */}
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${statConf.color}`}
+                      {/* Status badge (click to cycle) */}
+                      <button
+                        onClick={() => cycleDecisionStatus(decision.id)}
+                        title="Click to change status"
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border cursor-pointer hover:opacity-80 transition-opacity ${statConf.color}`}
                       >
                         <StatusIcon className="w-3 h-3" />
                         {statConf.label}
-                      </span>
+                      </button>
                       {/* User involvement badge */}
                       {userIsDecider && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
@@ -637,8 +699,25 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
                     </div>
                   </div>
 
-                  {/* Meta: decided by + date */}
+                  {/* Meta: decided by + date + actions */}
                   <div className="flex items-center gap-3 flex-shrink-0">
+                    {/* Edit + Delete buttons */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startEditDecision(decision); }}
+                        title="Edit decision"
+                        className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-accent transition-colors"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteDecision(decision.id); }}
+                        title="Delete decision"
+                        className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-rose-400 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border ${
                         ownerColors[decision.decidedBy] || 'bg-surface-3 text-text-muted border-border'

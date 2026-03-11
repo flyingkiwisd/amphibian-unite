@@ -12,7 +12,7 @@ import {
   Scale,
   StickyNote,
   DollarSign,
-  HeartPulse,
+  Trophy,
   BookOpen,
   Settings,
 } from 'lucide-react';
@@ -40,7 +40,7 @@ const moreTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
   { label: 'Notes', icon: StickyNote, view: 'notes' },
   { label: 'Roadmap', icon: Map, view: 'roadmap' },
   { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway' },
-  { label: 'LP Health', icon: HeartPulse, view: 'lp-health' },
+  { label: 'Leaderboard', icon: Trophy, view: 'leaderboard' },
   { label: 'Settings', icon: Settings, view: 'settings' },
 ];
 

@@ -34,6 +34,10 @@ import {
   Plus,
   RotateCcw,
   Check,
+  Paperclip,
+  Upload,
+  FileText,
+  UserPlus,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -572,6 +576,286 @@ function EditableDropdown<T extends string>({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FileAttachment — per-section file upload with localStorage persistence
+// ─────────────────────────────────────────────────────────────────────────────
+interface StoredFile {
+  name: string;
+  data: string;
+  type: string;
+  uploadedAt: string;
+}
+
+function FileAttachment({
+  sectionKey,
+  memberId,
+}: {
+  sectionKey: string;
+  memberId: string;
+}) {
+  const storageKey = `amphibian-unite-files-${memberId}-${sectionKey}`;
+  const [files, setFiles] = useState<StoredFile[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load files from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) setFiles(JSON.parse(stored));
+      else setFiles([]);
+    } catch { setFiles([]); }
+  }, [storageKey]);
+
+  const persistFiles = (newFiles: StoredFile[]) => {
+    setFiles(newFiles);
+    if (newFiles.length === 0) {
+      localStorage.removeItem(storageKey);
+    } else {
+      localStorage.setItem(storageKey, JSON.stringify(newFiles));
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Warn if file exceeds 500KB
+    if (file.size > 500 * 1024) {
+      alert(`File "${file.name}" is ${(file.size / 1024).toFixed(0)}KB which exceeds the 500KB limit. Please choose a smaller file.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const newFile: StoredFile = {
+        name: file.name,
+        data: reader.result as string,
+        type: file.type,
+        uploadedAt: new Date().toISOString(),
+      };
+      persistFiles([...files, newFile]);
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    persistFiles(files.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="inline-flex flex-wrap items-center gap-1">
+      <input
+        ref={fileInputRef}
+        type="file"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-text-muted hover:text-teal-400 hover:bg-white/5 transition-colors"
+        title="Attach file"
+      >
+        <Paperclip size={11} />
+      </button>
+      {files.map((file, i) => (
+        <span
+          key={`${file.name}-${i}`}
+          className="inline-flex items-center gap-1 rounded-full bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 text-[10px] font-medium text-teal-400"
+        >
+          <FileText size={9} />
+          <span className="max-w-[80px] truncate">{file.name}</span>
+          <button
+            onClick={() => removeFile(i)}
+            className="hover:text-rose-400 transition-colors flex-shrink-0"
+            title="Remove file"
+          >
+            <X size={9} />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AddMemberModal — modal form for creating new team members
+// ─────────────────────────────────────────────────────────────────────────────
+const PRESET_COLORS = [
+  { label: 'Teal', value: 'bg-teal-500' },
+  { label: 'Blue', value: 'bg-blue-500' },
+  { label: 'Purple', value: 'bg-purple-500' },
+  { label: 'Rose', value: 'bg-rose-500' },
+  { label: 'Amber', value: 'bg-amber-500' },
+  { label: 'Emerald', value: 'bg-emerald-500' },
+  { label: 'Indigo', value: 'bg-indigo-500' },
+  { label: 'Orange', value: 'bg-orange-500' },
+  { label: 'Cyan', value: 'bg-cyan-500' },
+  { label: 'Pink', value: 'bg-pink-500' },
+];
+
+const CUSTOM_MEMBERS_KEY = 'amphibian-unite-custom-members';
+
+function loadCustomMembers(): TeamMember[] {
+  try {
+    const stored = localStorage.getItem(CUSTOM_MEMBERS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveCustomMembers(members: TeamMember[]) {
+  if (members.length === 0) {
+    localStorage.removeItem(CUSTOM_MEMBERS_KEY);
+  } else {
+    localStorage.setItem(CUSTOM_MEMBERS_KEY, JSON.stringify(members));
+  }
+}
+
+function AddMemberModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (member: TeamMember) => void;
+}) {
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [color, setColor] = useState(PRESET_COLORS[0].value);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !role.trim()) return;
+
+    const id = `custom-${name.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+    const newMember: TeamMember = {
+      id,
+      name: name.trim(),
+      role: role.trim(),
+      shortRole: role.trim().split(' ')[0],
+      avatar: avatar.trim() || name.trim().split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase(),
+      color,
+      roleOneSentence: `${role.trim()} — custom team member`,
+      singleThreadedOwnership: [],
+      kpis: [],
+      nonNegotiables: [],
+      status: 'active',
+    };
+    onAdd(newMember);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative z-10 w-full max-w-md mx-4 rounded-2xl border border-border bg-surface shadow-2xl animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-6 pb-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <UserPlus size={18} className="text-accent" />
+            <h2 className="text-lg font-bold text-text-primary">Add Team Member</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 text-text-muted hover:bg-surface-3 hover:text-text-primary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Name */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5">Name *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Full name"
+              required
+              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30 transition-colors"
+            />
+          </div>
+          {/* Role */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5">Role *</label>
+            <input
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="e.g. Head of Operations"
+              required
+              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30 transition-colors"
+            />
+          </div>
+          {/* Avatar Emoji */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5">Avatar (emoji or initials)</label>
+            <input
+              type="text"
+              value={avatar}
+              onChange={(e) => setAvatar(e.target.value)}
+              placeholder="Leave blank for auto-initials"
+              maxLength={4}
+              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30 transition-colors"
+            />
+          </div>
+          {/* Color */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5">Color</label>
+            <div className="flex flex-wrap gap-2">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setColor(c.value)}
+                  className={`h-8 w-8 rounded-full ${c.value} transition-all duration-150 ${
+                    color === c.value
+                      ? 'ring-2 ring-offset-2 ring-offset-surface ring-white scale-110'
+                      : 'opacity-60 hover:opacity-100'
+                  }`}
+                  title={c.label}
+                />
+              ))}
+            </div>
+          </div>
+          {/* Preview */}
+          <div className="rounded-xl border border-border bg-surface-2 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-2">Preview</p>
+            <div className="flex items-center gap-3">
+              <div className={`${color} flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-white`}>
+                {avatar.trim() || name.trim().split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '??'}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-text-primary">{name || 'Name'}</p>
+                <p className="text-xs text-accent">{role || 'Role'}</p>
+              </div>
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={!name.trim() || !role.trim()}
+              className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all duration-200 hover:bg-accent-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <UserPlus size={15} />
+              Add Member
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl px-5 py-2.5 text-sm font-medium text-text-muted hover:text-text-primary hover:bg-surface-3 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Agent Assignment Mapping
 // ─────────────────────────────────────────────────────────────────────────────
 const AGENT_ASSIGNMENTS: Record<string, { primaryOwner: string; directReport: string }> = {
@@ -783,8 +1067,41 @@ function LikelihoodBadge({ level }: { level: 'high' | 'medium' | 'low' }) {
 // Tab Content Components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OverviewTab({ member, os }: { member: TeamMember; os: TeamOS }) {
+function OverviewTab({
+  member,
+  os,
+  setValue,
+  hasEdits,
+  resetSection,
+}: {
+  member: TeamMember;
+  os: TeamOS;
+  setValue: (path: string, value: unknown) => void;
+  hasEdits: (path: string) => boolean;
+  resetSection: (path: string) => void;
+}) {
   const { primaryOf, directReportOf } = getAgentAssignments(member.id);
+
+  // Get editable overview data (stored under overview.* paths, fallback to member data)
+  const stoKey = `amphibian-unite-edits-${member.id}`;
+  const [overviewEdits, setOverviewEdits] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(stoKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.overview) setOverviewEdits(parsed.overview);
+        else setOverviewEdits({});
+      } else {
+        setOverviewEdits({});
+      }
+    } catch { setOverviewEdits({}); }
+  }, [stoKey]);
+
+  const singleThreadedOwnership = overviewEdits.singleThreadedOwnership ?? member.singleThreadedOwnership;
+  const kpis = overviewEdits.kpis ?? member.kpis;
+  const nonNegotiables = overviewEdits.nonNegotiables ?? member.nonNegotiables;
 
   return (
     <div className="space-y-6">
@@ -811,15 +1128,17 @@ function OverviewTab({ member, os }: { member: TeamMember; os: TeamOS }) {
           <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
             Single-Threaded Ownership
           </h3>
+          <FileAttachment sectionKey="overview-sto" memberId={member.id} />
+          <span className="ml-auto text-xs text-text-muted font-mono">{singleThreadedOwnership.length}</span>
         </div>
-        <ul className="space-y-2 pl-1">
-          {member.singleThreadedOwnership.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <CheckCircle size={14} className="mt-0.5 flex-shrink-0 text-accent" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
+        <EditableList
+          items={singleThreadedOwnership}
+          onSave={(newItems) => setValue('overview.singleThreadedOwnership', newItems)}
+          isEdited={hasEdits('overview.singleThreadedOwnership')}
+          onReset={() => resetSection('overview.singleThreadedOwnership')}
+          icon={CheckCircle}
+          iconColor="text-accent"
+        />
       </section>
 
       {/* KPIs */}
@@ -829,17 +1148,17 @@ function OverviewTab({ member, os }: { member: TeamMember; os: TeamOS }) {
             <Target size={15} className="text-blue-400" />
           </div>
           <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">KPIs</h3>
+          <FileAttachment sectionKey="overview-kpis" memberId={member.id} />
+          <span className="ml-auto text-xs text-text-muted font-mono">{kpis.length}</span>
         </div>
-        <ul className="space-y-2 pl-1">
-          {member.kpis.map((kpi, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <div className="mt-1 flex-shrink-0">
-                <div className="h-2.5 w-2.5 rounded-full border-2 border-blue-400 bg-blue-400/20" />
-              </div>
-              <span className="text-sm leading-relaxed text-text-secondary">{kpi}</span>
-            </li>
-          ))}
-        </ul>
+        <EditableList
+          items={kpis}
+          onSave={(newItems) => setValue('overview.kpis', newItems)}
+          isEdited={hasEdits('overview.kpis')}
+          onReset={() => resetSection('overview.kpis')}
+          icon={Target}
+          iconColor="text-blue-400"
+        />
       </section>
 
       {/* Non-Negotiables */}
@@ -849,15 +1168,17 @@ function OverviewTab({ member, os }: { member: TeamMember; os: TeamOS }) {
             <Shield size={15} className="text-rose-400" />
           </div>
           <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Non-Negotiables</h3>
+          <FileAttachment sectionKey="overview-nonneg" memberId={member.id} />
+          <span className="ml-auto text-xs text-text-muted font-mono">{nonNegotiables.length}</span>
         </div>
-        <ul className="space-y-2 pl-1">
-          {member.nonNegotiables.map((item, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <Shield size={14} className="mt-0.5 flex-shrink-0 text-rose-400" />
-              <span className="text-sm leading-relaxed text-text-secondary">{item}</span>
-            </li>
-          ))}
-        </ul>
+        <EditableList
+          items={nonNegotiables}
+          onSave={(newItems) => setValue('overview.nonNegotiables', newItems)}
+          isEdited={hasEdits('overview.nonNegotiables')}
+          onReset={() => resetSection('overview.nonNegotiables')}
+          icon={Shield}
+          iconColor="text-rose-400"
+        />
       </section>
 
       {/* Agent Assignments */}
@@ -905,11 +1226,13 @@ function OverviewTab({ member, os }: { member: TeamMember; os: TeamOS }) {
 
 function Feedback360Tab({
   os,
+  memberId,
   setValue,
   hasEdits,
   resetSection,
 }: {
   os: TeamOS;
+  memberId: string;
   setValue: (path: string, value: unknown) => void;
   hasEdits: (path: string) => boolean;
   resetSection: (path: string) => void;
@@ -947,6 +1270,7 @@ function Feedback360Tab({
               <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
                 {section.title}
               </h3>
+              <FileAttachment sectionKey={`360-${section.key}`} memberId={memberId} />
               <span className="ml-auto text-xs text-text-muted font-mono">{section.items.length}</span>
             </div>
             <EditableList
@@ -966,11 +1290,13 @@ function Feedback360Tab({
 
 function OperatingSystemTab({
   os,
+  memberId,
   setValue,
   hasEdits,
   resetSection,
 }: {
   os: TeamOS;
+  memberId: string;
   setValue: (path: string, value: unknown) => void;
   hasEdits: (path: string) => boolean;
   resetSection: (path: string) => void;
@@ -1042,6 +1368,7 @@ function OperatingSystemTab({
                 <SIcon size={15} className={sec.iconColor} />
               </div>
               <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">{sec.title}</h3>
+              <FileAttachment sectionKey={`os-${sec.key}`} memberId={memberId} />
             </div>
             <EditableList
               items={items}
@@ -1074,11 +1401,13 @@ function OperatingSystemTab({
 
 function QualitiesTab({
   os,
+  memberId,
   setValue,
   hasEdits,
   resetSection,
 }: {
   os: TeamOS;
+  memberId: string;
   setValue: (path: string, value: unknown) => void;
   hasEdits: (path: string) => boolean;
   resetSection: (path: string) => void;
@@ -1096,6 +1425,7 @@ function QualitiesTab({
           <p className="text-xs text-text-muted uppercase tracking-wider">Average Score</p>
           <p className="text-2xl font-bold text-accent">{avgScore}<span className="text-sm text-text-muted">/5</span></p>
         </div>
+        <FileAttachment sectionKey="qualities" memberId={memberId} />
         <div className="h-8 w-px bg-border hidden sm:block" />
         <div className="text-center">
           <p className="text-xs text-text-muted uppercase tracking-wider">Qualities</p>
@@ -1191,11 +1521,13 @@ function QualitiesTab({
 
 function RdsTab({
   os,
+  memberId,
   setValue,
   hasEdits,
   resetSection,
 }: {
   os: TeamOS;
+  memberId: string;
   setValue: (path: string, value: unknown) => void;
   hasEdits: (path: string) => boolean;
   resetSection: (path: string) => void;
@@ -1240,6 +1572,7 @@ function RdsTab({
           <div className="flex items-center gap-2 mb-3">
             <Trash2 size={15} className="text-rose-400" />
             <h4 className="text-sm font-semibold text-rose-400 uppercase tracking-wide">Remove</h4>
+            <FileAttachment sectionKey="rds-remove" memberId={memberId} />
             <span className="ml-auto text-xs text-text-muted font-mono">{rds.remove.length}</span>
           </div>
           <div className="space-y-3">
@@ -1294,6 +1627,7 @@ function RdsTab({
           <div className="flex items-center gap-2 mb-3">
             <ArrowRight size={15} className="text-blue-400" />
             <h4 className="text-sm font-semibold text-blue-400 uppercase tracking-wide">Delegate</h4>
+            <FileAttachment sectionKey="rds-delegate" memberId={memberId} />
             <span className="ml-auto text-xs text-text-muted font-mono">{rds.delegate.length}</span>
           </div>
           <div className="space-y-3">
@@ -1351,6 +1685,7 @@ function RdsTab({
           <div className="flex items-center gap-2 mb-3">
             <BarChart3 size={15} className="text-accent" />
             <h4 className="text-sm font-semibold text-accent uppercase tracking-wide">Systematize</h4>
+            <FileAttachment sectionKey="rds-systematize" memberId={memberId} />
             <span className="ml-auto text-xs text-text-muted font-mono">{rds.systematize.length}</span>
           </div>
           <div className="space-y-3">
@@ -1406,11 +1741,13 @@ function RdsTab({
 
 function RiskTab({
   os,
+  memberId,
   setValue,
   hasEdits,
   resetSection,
 }: {
   os: TeamOS;
+  memberId: string;
   setValue: (path: string, value: unknown) => void;
   hasEdits: (path: string) => boolean;
   resetSection: (path: string) => void;
@@ -1433,6 +1770,7 @@ function RiskTab({
             <AlertTriangle size={15} className="text-rose-400" />
           </div>
           <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Personal Risks</h3>
+          <FileAttachment sectionKey="risk" memberId={memberId} />
         </div>
 
         {/* Desktop: table */}
@@ -1801,6 +2139,8 @@ function AgentIntelTab({ memberId }: { memberId: string }) {
 export function TeamView({ currentUser }: { currentUser?: string }) {
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [customMembers, setCustomMembers] = useState<TeamMember[]>(() => loadCustomMembers());
 
   // Pre-compute base OS data for quick stats on cards
   const memberOSMap = useMemo(() => {
@@ -1811,15 +2151,20 @@ export function TeamView({ currentUser }: { currentUser?: string }) {
     return map;
   }, []);
 
+  // Combined list of built-in + custom members
+  const allMembers = useMemo(() => [...teamMembers, ...customMembers], [customMembers]);
+
   // Sort current user's card to appear first in the grid
   const sortedMembers = useMemo(() => {
-    if (!currentUser) return teamMembers;
-    return [...teamMembers].sort((a, b) => {
+    if (!currentUser) return allMembers;
+    return [...allMembers].sort((a, b) => {
       if (a.id === currentUser) return -1;
       if (b.id === currentUser) return 1;
       return 0;
     });
-  }, [currentUser]);
+  }, [currentUser, allMembers]);
+
+  const isCustomMember = selectedMember?.id.startsWith('custom-') ?? false;
 
   const baseOS = selectedMember ? memberOSMap[selectedMember.id] : undefined;
 
@@ -1840,6 +2185,28 @@ export function TeamView({ currentUser }: { currentUser?: string }) {
   const handleClose = () => {
     setSelectedMember(null);
     setActiveTab('overview');
+  };
+
+  const handleAddMember = (member: TeamMember) => {
+    const updated = [...customMembers, member];
+    setCustomMembers(updated);
+    saveCustomMembers(updated);
+  };
+
+  const handleDeleteCustomMember = (memberId: string) => {
+    const updated = customMembers.filter((m) => m.id !== memberId);
+    setCustomMembers(updated);
+    saveCustomMembers(updated);
+    // Clean up localStorage data for deleted member
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes(memberId))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    handleClose();
   };
 
   return (
@@ -1892,6 +2259,11 @@ export function TeamView({ currentUser }: { currentUser?: string }) {
                     {isYou && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
                         You
+                      </span>
+                    )}
+                    {member.id.startsWith('custom-') && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30 uppercase tracking-wider">
+                        Custom
                       </span>
                     )}
                     {member.status === 'active' ? (
@@ -1951,7 +2323,29 @@ export function TeamView({ currentUser }: { currentUser?: string }) {
             </button>
           );
         })}
+
+        {/* Add Team Member Card */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="glow-card group text-left rounded-xl border border-dashed border-border p-5 transition-all duration-300 hover:border-accent/40 hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-accent/50 flex flex-col items-center justify-center min-h-[140px] gap-3"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent transition-colors group-hover:bg-accent/20">
+            <UserPlus size={20} />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-text-muted group-hover:text-text-primary transition-colors">Add Team Member</p>
+            <p className="text-xs text-text-muted mt-0.5">Create a new profile</p>
+          </div>
+        </button>
       </div>
+
+      {/* ── Add Member Modal ── */}
+      {showAddModal && (
+        <AddMemberModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={handleAddMember}
+        />
+      )}
 
       {/* ── Full Member OS Overlay ── */}
       {selectedMember && (
@@ -1998,13 +2392,28 @@ export function TeamView({ currentUser }: { currentUser?: string }) {
                       {selectedMember.role}
                     </p>
                   </div>
-                  {/* Close Button */}
-                  <button
-                    onClick={handleClose}
-                    className="flex-shrink-0 rounded-lg p-2 text-text-muted transition-colors hover:bg-surface-3 hover:text-text-primary"
-                  >
-                    <X size={20} />
-                  </button>
+                  {/* Delete custom member + Close Button */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {isCustomMember && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete ${selectedMember.name}? This cannot be undone.`)) {
+                            handleDeleteCustomMember(selectedMember.id);
+                          }
+                        }}
+                        className="rounded-lg p-2 text-text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                        title="Delete this custom member"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleClose}
+                      className="rounded-lg p-2 text-text-muted transition-colors hover:bg-surface-3 hover:text-text-primary"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2054,12 +2463,12 @@ export function TeamView({ currentUser }: { currentUser?: string }) {
               )}
               {selectedOS ? (
                 <>
-                  {activeTab === 'overview' && <OverviewTab member={selectedMember} os={selectedOS} />}
-                  {activeTab === '360' && <Feedback360Tab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
-                  {activeTab === 'os' && <OperatingSystemTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
-                  {activeTab === 'qualities' && <QualitiesTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
-                  {activeTab === 'rds' && <RdsTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
-                  {activeTab === 'risk' && <RiskTab os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'overview' && <OverviewTab member={selectedMember} os={selectedOS} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === '360' && <Feedback360Tab os={selectedOS} memberId={selectedMember.id} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'os' && <OperatingSystemTab os={selectedOS} memberId={selectedMember.id} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'qualities' && <QualitiesTab os={selectedOS} memberId={selectedMember.id} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'rds' && <RdsTab os={selectedOS} memberId={selectedMember.id} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
+                  {activeTab === 'risk' && <RiskTab os={selectedOS} memberId={selectedMember.id} setValue={setValue} hasEdits={hasEdits} resetSection={resetSection} />}
                   {activeTab === 'journal' && <JournalTab memberId={selectedMember.id} />}
                   {activeTab === 'agent-intel' && <AgentIntelTab memberId={selectedMember.id} />}
                 </>
