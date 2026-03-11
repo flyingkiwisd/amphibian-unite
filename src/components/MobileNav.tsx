@@ -5,25 +5,14 @@ import {
   Bot,
   CheckSquare,
   Target,
-  Cpu,
   MoreHorizontal,
   Search,
   Users,
   Map,
   Scale,
   StickyNote,
-  Activity,
-  Trophy,
-  ClipboardCheck,
-  Handshake,
-  CalendarClock,
-  RefreshCw,
-  MessageCircle,
   DollarSign,
   HeartPulse,
-  Radar,
-  Network,
-  UserCheck,
   BookOpen,
   Settings,
 } from 'lucide-react';
@@ -40,29 +29,18 @@ interface MobileNavProps {
 const primaryTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
   { label: 'Home', icon: LayoutDashboard, view: 'dashboard' },
   { label: 'Tasks', icon: CheckSquare, view: 'tasks' },
-  { label: 'Agents', icon: Bot, view: 'agents' },
+  { label: 'Journal', icon: BookOpen, view: 'journal' },
   { label: 'OKRs', icon: Target, view: 'okrs' },
 ];
 
 const moreTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
-  { label: 'Team', icon: Users, view: 'team' },
-  { label: 'Leaderboard', icon: Trophy, view: 'leaderboard' },
   { label: 'Decisions', icon: Scale, view: 'decisions' },
-  { label: 'Roadmap', icon: Map, view: 'roadmap' },
-  { label: 'Journal', icon: BookOpen, view: 'journal' },
+  { label: 'Team', icon: Users, view: 'team' },
+  { label: '14 Agents', icon: Bot, view: 'agents' },
   { label: 'Notes', icon: StickyNote, view: 'notes' },
-  { label: 'Activity', icon: Activity, view: 'activity' },
-  { label: 'AI Edge', icon: Cpu, view: 'ai-edge' },
-  { label: 'Accountability', icon: ClipboardCheck, view: 'accountability' },
-  { label: 'Meeting Intel', icon: CalendarClock, view: 'meeting-intel' },
-  { label: 'What Changed', icon: RefreshCw, view: 'what-changed' },
-  { label: 'Peer Feedback', icon: MessageCircle, view: 'peer-feedback' },
-  { label: 'Founder Align', icon: Handshake, view: 'founder-alignment' },
+  { label: 'Roadmap', icon: Map, view: 'roadmap' },
   { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway' },
   { label: 'LP Health', icon: HeartPulse, view: 'lp-health' },
-  { label: 'Competitive Intel', icon: Radar, view: 'competitive-intel' },
-  { label: 'Knowledge Graph', icon: Network, view: 'knowledge-graph' },
-  { label: 'Role Drift', icon: UserCheck, view: 'role-drift' },
   { label: 'Settings', icon: Settings, view: 'settings' },
 ];
 
@@ -88,7 +66,7 @@ export function MobileNav({ currentView, onViewChange, onOpenSearch }: MobileNav
                 Search
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
+            <div className="grid grid-cols-4 gap-2" onClick={(e) => e.stopPropagation()}>
               {moreTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = currentView === tab.view;

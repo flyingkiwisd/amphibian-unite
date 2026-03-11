@@ -8,24 +8,13 @@ import {
   Target,
   CheckSquare,
   Map,
-  Cpu,
   ChevronLeft,
   ChevronRight,
   Scale,
   StickyNote,
-  Activity,
   Search,
-  Trophy,
-  ClipboardCheck,
-  Handshake,
-  CalendarClock,
-  RefreshCw,
-  MessageCircle,
   DollarSign,
   HeartPulse,
-  Radar,
-  Network,
-  UserCheck,
   BookOpen,
   Settings,
 } from 'lucide-react';
@@ -43,29 +32,20 @@ interface SidebarProps {
 }
 
 const navItems: { label: string; icon: React.ElementType; view: ViewType; group: number }[] = [
+  // Core 7
   { label: 'Dashboard', icon: LayoutDashboard, view: 'dashboard', group: 1 },
-  { label: '14 Agents', icon: Bot, view: 'agents', group: 1 },
+  { label: 'Tasks', icon: CheckSquare, view: 'tasks', group: 1 },
+  { label: 'OKRs & KPIs', icon: Target, view: 'okrs', group: 1 },
+  { label: 'Decisions', icon: Scale, view: 'decisions', group: 1 },
+  { label: 'Journal', icon: BookOpen, view: 'journal', group: 1 },
   { label: 'Team', icon: Users, view: 'team', group: 1 },
-  { label: 'OKRs & KPIs', icon: Target, view: 'okrs', group: 2 },
-  { label: 'Tasks', icon: CheckSquare, view: 'tasks', group: 2 },
-  { label: 'Decisions', icon: Scale, view: 'decisions', group: 2 },
+  { label: '14 Agents', icon: Bot, view: 'agents', group: 1 },
+  // More
+  { label: 'Notes', icon: StickyNote, view: 'notes', group: 2 },
   { label: 'Roadmap', icon: Map, view: 'roadmap', group: 2 },
-  { label: 'Leaderboard', icon: Trophy, view: 'leaderboard', group: 2 },
-  { label: 'Accountability', icon: ClipboardCheck, view: 'accountability', group: 2 },
-  { label: 'Meeting Intel', icon: CalendarClock, view: 'meeting-intel', group: 2 },
-  { label: 'Journal', icon: BookOpen, view: 'journal', group: 3 },
-  { label: 'Notes', icon: StickyNote, view: 'notes', group: 3 },
-  { label: 'Activity', icon: Activity, view: 'activity', group: 3 },
-  { label: 'AI Edge', icon: Cpu, view: 'ai-edge', group: 3 },
-  { label: 'What Changed', icon: RefreshCw, view: 'what-changed', group: 3 },
-  { label: 'Peer Feedback', icon: MessageCircle, view: 'peer-feedback', group: 3 },
-  { label: 'Founder Align', icon: Handshake, view: 'founder-alignment', group: 4 },
-  { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway', group: 4 },
-  { label: 'LP Health', icon: HeartPulse, view: 'lp-health', group: 4 },
-  { label: 'Competitive Intel', icon: Radar, view: 'competitive-intel', group: 4 },
-  { label: 'Knowledge Graph', icon: Network, view: 'knowledge-graph', group: 4 },
-  { label: 'Role Drift', icon: UserCheck, view: 'role-drift', group: 4 },
-  { label: 'Settings', icon: Settings, view: 'settings', group: 5 },
+  { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway', group: 2 },
+  { label: 'LP Health', icon: HeartPulse, view: 'lp-health', group: 2 },
+  { label: 'Settings', icon: Settings, view: 'settings', group: 2 },
 ];
 
 export function Sidebar({
@@ -81,7 +61,7 @@ export function Sidebar({
   const userName = user?.name ?? 'Unknown';
   const userRole = user?.shortRole ?? '';
 
-  const groups = [1, 2, 3, 4, 5];
+  const groups = [1, 2];
 
   return (
     <aside
