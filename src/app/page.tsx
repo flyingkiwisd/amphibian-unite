@@ -26,15 +26,26 @@ import { KnowledgeGraphView } from '@/components/views/KnowledgeGraphView';
 import { RoleDriftView } from '@/components/views/RoleDriftView';
 import { LoginScreen } from '@/components/LoginScreen';
 import { CommandPalette } from '@/components/CommandPalette';
+import { useClerkAuth } from '@/hooks/useClerkAuth';
 
 export type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift';
 
 export default function Home() {
+  // Clerk auth — returns { isClerkActive, clerkUserId, isLoaded }
+  // When Clerk is not configured, isClerkActive=false and we fall back to profile selector
+  const { isClerkActive, clerkMemberId, isLoaded: clerkLoaded } = useClerkAuth();
+
+  // Legacy profile selector state (dev mode)
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [localUser, setLocalUser] = useState<string | null>(null);
+
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Resolve the current user: Clerk auth takes precedence over profile selector
+  const currentUser = isClerkActive ? clerkMemberId : localUser;
+  const isAuthenticated = isClerkActive ? !!clerkMemberId : isLoggedIn;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -48,8 +59,47 @@ export default function Home() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  if (!isLoggedIn) {
-    return <LoginScreen onLogin={(user) => { setCurrentUser(user); setIsLoggedIn(true); }} />;
+  // Loading state while Clerk initializes
+  if (isClerkActive && !clerkLoaded) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-text-secondary text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated — show login screen (profile selector for dev, Clerk handles redirect in prod)
+  if (!isAuthenticated) {
+    if (isClerkActive) {
+      // Clerk is active but user isn't mapped to a team member
+      // This means they signed in via Clerk but their email isn't recognized
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="text-center max-w-md mx-auto p-8">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-danger/10 flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-danger">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-foreground mb-2">Access Restricted</h2>
+            <p className="text-text-secondary text-sm mb-4">
+              Your email isn&apos;t linked to an Amphibian Unite team member.
+              Contact your admin to get access.
+            </p>
+            <p className="text-text-muted text-xs">
+              Amphibian Unite is for authorized team members only.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    // Dev mode — show profile selector
+    return <LoginScreen onLogin={(user) => { setLocalUser(user); setIsLoggedIn(true); }} />;
   }
 
   const handleNavigate = (view: string) => {
