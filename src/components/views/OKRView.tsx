@@ -43,19 +43,6 @@ const statusColor = (status: string) => {
   }
 };
 
-const statusLabel = (status: string) => {
-  switch (status) {
-    case 'on-track':
-      return 'On Track';
-    case 'at-risk':
-      return 'At Risk';
-    case 'behind':
-      return 'Behind';
-    default:
-      return status;
-  }
-};
-
 const statusOptions = [
   { label: 'On Track', value: 'on-track', color: 'bg-success/20 text-success' },
   { label: 'At Risk', value: 'at-risk', color: 'bg-warning/20 text-warning' },

@@ -13,6 +13,7 @@ import {
   TrendingUp,
   ArrowRight,
   Command,
+  Compass,
   DollarSign,
   Trophy,
   StickyNote,
@@ -110,6 +111,14 @@ const navigationItems: SearchResult[] = [
     subtitle: 'AUM, burn rate, and scenario modeling',
     category: 'Navigation',
     action: 'cash-runway',
+  },
+  {
+    id: 'nav-role-drift',
+    icon: <Compass className="w-4 h-4" />,
+    title: 'Role Drift',
+    subtitle: 'Track how roles evolve vs. original design — spot drift early',
+    category: 'Navigation',
+    action: 'role-drift',
   },
   {
     id: 'nav-leaderboard',
