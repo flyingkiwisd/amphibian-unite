@@ -1010,6 +1010,87 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
             ) : (
             <>
             {/* ============================================================= */}
+            {/* AI ADVISOR — Questions to Consider */}
+            {/* ============================================================= */}
+            {currentUser && (() => {
+              const member = getMemberById(currentUser);
+              const memberNameFull = member?.name ?? ownerName;
+              const memberRoleFull = member?.role ?? '';
+
+              // Build rich context from journal + TeamOS
+              const aiContext: Record<string, unknown> = {};
+
+              // Current journal entry data
+              if (activeEntry) {
+                if (activeEntry.mood) aiContext.mood = activeEntry.mood;
+                if (activeEntry.energy) aiContext.energy = activeEntry.energy;
+                if (activeEntry.wins?.filter(Boolean).length) aiContext.wins = activeEntry.wins.filter(Boolean);
+                if (activeEntry.reflections?.filter(Boolean).length) aiContext.reflections = activeEntry.reflections.filter(Boolean);
+                if (activeEntry.gratitude) aiContext.gratitude = activeEntry.gratitude;
+                if (activeEntry.notes) aiContext.notes = activeEntry.notes;
+                if (activeEntry.winOfTheDay) aiContext.wins = [...(aiContext.wins as string[] ?? []), activeEntry.winOfTheDay];
+                if (activeEntry.dailyPromptResponse) aiContext.dailyPromptResponse = activeEntry.dailyPromptResponse;
+                if (activeEntry.eveningWentWell) aiContext.notes = `${aiContext.notes ?? ''}\nWhat went well: ${activeEntry.eveningWentWell}`;
+                if (activeEntry.eveningCouldImprove) aiContext.notes = `${aiContext.notes ?? ''}\nCould improve: ${activeEntry.eveningCouldImprove}`;
+              }
+
+              // TeamOS data
+              if (memberOS) {
+                aiContext.commitments = memberOS.operatingSystem.commitments;
+                aiContext.decisionFilter = memberOS.operatingSystem.decisionFilter;
+                aiContext.morningChecklist = memberOS.operatingSystem.morningChecklist;
+                aiContext.mantra = memberOS.operatingSystem.mantra;
+              }
+
+              // KPIs
+              if (member?.kpis?.length) aiContext.kpis = member.kpis;
+
+              // OKRs (for this member)
+              const memberOkrs = okrs.filter((o) =>
+                o.keyResults.some((kr) => kr.owner === ownerName || kr.owner === memberNameFull)
+              );
+              if (memberOkrs.length) {
+                aiContext.okrs = memberOkrs.map((o) => `${o.objective} [${o.status}]`);
+              }
+
+              // Top 3 priorities from accountability store
+              try {
+                const acctStored = localStorage.getItem('amphibian-accountability');
+                if (acctStored) {
+                  const acctData = JSON.parse(acctStored);
+                  const todayDate = new Date().toISOString().split('T')[0];
+                  const memberEntries = acctData[currentUser]?.entries ?? [];
+                  const todayAcct = memberEntries.find((e: { date: string }) => e.date === todayDate);
+                  if (todayAcct?.commitments?.length) {
+                    aiContext.priorities = todayAcct.commitments.map(
+                      (c: { text: string; status: string }) => `${c.text} [${c.status}]`
+                    );
+                  }
+                }
+              } catch { /* ignore */ }
+
+              return (
+                <AIChatPanel
+                  memberId={currentUser}
+                  memberName={memberNameFull}
+                  memberRole={memberRoleFull}
+                  context={aiContext}
+                  title="Questions to Consider"
+                  titleIcon="bot"
+                  defaultCollapsed={false}
+                  suggestedPrompts={[
+                    'What should I be thinking about today given my priorities?',
+                    'What blind spots might I have right now?',
+                    'What decision am I avoiding that needs to be made?',
+                    'How can I make the biggest impact today?',
+                    'What would a world-class CEO focus on in my position?',
+                    'Challenge my thinking on my current top priority',
+                  ]}
+                />
+              );
+            })()}
+
+            {/* ============================================================= */}
             {/* FEATURE 5: QUESTION OF THE DAY — Daily Firm Prompt */}
             {/* ============================================================= */}
             <div className="relative overflow-hidden rounded-xl bg-teal-500/5 border border-teal-500/25 p-4">
@@ -1898,87 +1979,6 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
           )}
         </div>
       )}
-
-      {/* ════════════ AI Advisor Panel ════════════ */}
-      {currentUser && (() => {
-        const member = getMemberById(currentUser);
-        const memberNameFull = member?.name ?? ownerName;
-        const memberRoleFull = member?.role ?? '';
-
-        // Build rich context from journal + TeamOS
-        const aiContext: Record<string, unknown> = {};
-
-        // Current journal entry data
-        if (todayEntry) {
-          if (todayEntry.mood) aiContext.mood = todayEntry.mood;
-          if (todayEntry.energy) aiContext.energy = todayEntry.energy;
-          if (todayEntry.wins?.filter(Boolean).length) aiContext.wins = todayEntry.wins.filter(Boolean);
-          if (todayEntry.reflections?.filter(Boolean).length) aiContext.reflections = todayEntry.reflections.filter(Boolean);
-          if (todayEntry.gratitude) aiContext.gratitude = todayEntry.gratitude;
-          if (todayEntry.notes) aiContext.notes = todayEntry.notes;
-          if (todayEntry.winOfTheDay) aiContext.wins = [...(aiContext.wins as string[] ?? []), todayEntry.winOfTheDay];
-          if (todayEntry.dailyPromptResponse) aiContext.dailyPromptResponse = todayEntry.dailyPromptResponse;
-          if (todayEntry.eveningWentWell) aiContext.notes = `${aiContext.notes ?? ''}\nWhat went well: ${todayEntry.eveningWentWell}`;
-          if (todayEntry.eveningCouldImprove) aiContext.notes = `${aiContext.notes ?? ''}\nCould improve: ${todayEntry.eveningCouldImprove}`;
-        }
-
-        // TeamOS data
-        if (memberOS) {
-          aiContext.commitments = memberOS.operatingSystem.commitments;
-          aiContext.decisionFilter = memberOS.operatingSystem.decisionFilter;
-          aiContext.morningChecklist = memberOS.operatingSystem.morningChecklist;
-          aiContext.mantra = memberOS.operatingSystem.mantra;
-        }
-
-        // KPIs
-        if (member?.kpis?.length) aiContext.kpis = member.kpis;
-
-        // OKRs (for this member)
-        const memberOkrs = okrs.filter((o) =>
-          o.keyResults.some((kr) => kr.owner === ownerName || kr.owner === memberNameFull)
-        );
-        if (memberOkrs.length) {
-          aiContext.okrs = memberOkrs.map((o) => `${o.objective} [${o.status}]`);
-        }
-
-        // Top 3 priorities from accountability store
-        try {
-          const acctStored = localStorage.getItem('amphibian-accountability');
-          if (acctStored) {
-            const acctData = JSON.parse(acctStored);
-            const todayDate = new Date().toISOString().split('T')[0];
-            const memberEntries = acctData[currentUser]?.entries ?? [];
-            const todayAcct = memberEntries.find((e: { date: string }) => e.date === todayDate);
-            if (todayAcct?.commitments?.length) {
-              aiContext.priorities = todayAcct.commitments.map(
-                (c: { text: string; status: string }) => `${c.text} [${c.status}]`
-              );
-            }
-          }
-        } catch { /* ignore */ }
-
-        return (
-          <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
-            <AIChatPanel
-              memberId={currentUser}
-              memberName={memberNameFull}
-              memberRole={memberRoleFull}
-              context={aiContext}
-              title="Your AI Advisor"
-              titleIcon="bot"
-              defaultCollapsed={true}
-              suggestedPrompts={[
-                'Based on my journal, what patterns do you see?',
-                'Help me set better intentions for tomorrow',
-                'What should I focus on given my mood and energy?',
-                'Give me feedback on my daily reflection',
-                'What am I avoiding that I should face?',
-                'How can I improve my morning routine?',
-              ]}
-            />
-          </div>
-        );
-      })()}
 
       {/* Toast notification */}
       {toastMessage && (
