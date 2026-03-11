@@ -578,6 +578,18 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
       ...e,
       publishedAt: new Date().toISOString(),
     }));
+    // Auto-open the published library and expand this entry
+    setShowPublishedLibrary(true);
+    setExpandedPublished((prev) => {
+      const next = new Set(prev);
+      next.add(entryId);
+      return next;
+    });
+    setToastMessage('Entry published! View it in your library below.');
+    // Scroll to library after a short delay to allow render
+    setTimeout(() => {
+      document.getElementById('published-library')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
   }
 
   function unpublishEntry(entryId: string) {
@@ -1482,7 +1494,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
       {/* PUBLISHED LIBRARY */}
       {/* ============================================================= */}
       {publishedEntries.length > 0 && (
-        <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 overflow-hidden">
+        <div id="published-library" className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 overflow-hidden">
           <button
             onClick={() => setShowPublishedLibrary(!showPublishedLibrary)}
             className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-emerald-500/5 transition-colors"
