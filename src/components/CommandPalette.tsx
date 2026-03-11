@@ -86,14 +86,6 @@ const navigationItems: SearchResult[] = [
     category: 'Navigation',
     action: 'team',
   },
-  {
-    id: 'nav-agents',
-    icon: <Bot className="w-4 h-4" />,
-    title: '14 Agents',
-    subtitle: 'AI agent fleet — status, health, ownership',
-    category: 'Navigation',
-    action: 'agents',
-  },
   // Supporting
   {
     id: 'nav-notes',

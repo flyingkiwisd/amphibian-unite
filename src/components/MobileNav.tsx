@@ -36,7 +36,6 @@ const primaryTabs: { label: string; icon: React.ElementType; view: ViewType }[] 
 const moreTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
   { label: 'Decisions', icon: Scale, view: 'decisions' },
   { label: 'Team', icon: Users, view: 'team' },
-  { label: '14 Agents', icon: Bot, view: 'agents' },
   { label: 'Notes', icon: StickyNote, view: 'notes' },
   { label: 'Roadmap', icon: Map, view: 'roadmap' },
   { label: 'Cash Runway', icon: DollarSign, view: 'cash-runway' },

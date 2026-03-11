@@ -37,6 +37,7 @@ import {
 } from '@/lib/data';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, InlineSelect, EditBanner } from '@/components/InlineEdit';
+import { AIChatPanel } from '@/components/AIChatPanel';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -1412,6 +1413,47 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* ════════════ Section 8: AI Advisor ════════════ */}
+      <div className="animate-fade-in" style={{ animationDelay: '625ms' }}>
+        <AIChatPanel
+          memberId={currentUser}
+          memberName={member.name}
+          memberRole={member.role}
+          context={{
+            priorities: todayCommitments.map(
+              (c) => `${c.text} [${c.status}]`
+            ),
+            weeklyGoals: weeklyData.goals.map(
+              (g) => `${g.text} [${g.status}]`
+            ),
+            monthlyGoals: monthlyData.goals.map(
+              (g) => `${g.text} [${g.status}]`
+            ),
+            kpis: personalData.kpis.map(
+              (k) => `${k.text} [${k.status}]${k.notes ? ` — ${k.notes}` : ''}`
+            ),
+            ownership: personalData.ownership.map(
+              (a) => `${a.text} [${a.status}]${a.notes ? ` — ${a.notes}` : ''}`
+            ),
+            okrs: myOkrs.flatMap((okr) =>
+              okr.myKeyResults.map((kr) => `${okr.objective}: ${kr.text} (${kr.progress}%) [${okr.status}]`)
+            ),
+          }}
+          title="Ask Your AI Advisor"
+          titleIcon="lightbulb"
+          compact={true}
+          defaultCollapsed={true}
+          suggestedPrompts={[
+            'What should I focus on today?',
+            'How am I tracking against my OKRs?',
+            "What's the most impactful thing I could do this week?",
+            'Help me think through a decision',
+            'Where am I at risk of dropping the ball?',
+            'Give me a brutally honest assessment of my progress',
+          ]}
+        />
       </div>
     </div>
   );

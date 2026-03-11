@@ -196,6 +196,12 @@ export default function Home() {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           currentUser={currentUser}
           onOpenSearch={() => setCommandPaletteOpen(true)}
+          onSwitchProfile={(userId) => {
+            setLocalUser(userId);
+            setIsLoggedIn(true);
+            setCurrentView('dashboard');
+            setHasShownWelcome(false);
+          }}
         />
       </div>
 

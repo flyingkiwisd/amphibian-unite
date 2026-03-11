@@ -17,7 +17,8 @@ import {
   Edit3,
   Trash2,
 } from 'lucide-react';
-import { memberIdToOwnerName } from '@/lib/data';
+import { memberIdToOwnerName, getMemberById } from '@/lib/data';
+import { AIChatPanel } from '@/components/AIChatPanel';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -245,6 +246,7 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
   });
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingDecisionId, setEditingDecisionId] = useState<string | null>(null);
+  const [showAIAdvisor, setShowAIAdvisor] = useState(false);
 
   // ── Counts ──
   const counts = {
@@ -637,26 +639,70 @@ export function DecisionLogView({ currentUser }: { currentUser?: string }) {
           </div>
 
           {/* Submit row */}
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+          <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
             <button
-              onClick={() => {
-                setShowForm(false);
-                setEditingDecisionId(null);
-                setForm({ ...emptyForm, decidedBy: ownerName || emptyForm.decidedBy });
-              }}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-2 border border-border transition-all duration-200"
+              onClick={() => setShowAIAdvisor(!showAIAdvisor)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-accent bg-accent/10 border border-accent/30 hover:bg-accent/20 transition-all duration-200"
             >
-              Cancel
+              <Sparkles className="w-3.5 h-3.5" />
+              {showAIAdvisor ? 'Hide AI Advisor' : 'Ask AI Advisor'}
             </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!form.title.trim() || !form.rationale.trim()}
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent-2 transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-            >
-              <CheckCircle className="w-4 h-4" />
-              {editingDecisionId ? 'Save Changes' : 'Submit Decision'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingDecisionId(null);
+                  setShowAIAdvisor(false);
+                  setForm({ ...emptyForm, decidedBy: ownerName || emptyForm.decidedBy });
+                }}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-secondary bg-surface-3 hover:bg-surface-2 border border-border transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!form.title.trim() || !form.rationale.trim()}
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold bg-accent text-white shadow-lg shadow-accent/20 hover:bg-accent-2 transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {editingDecisionId ? 'Save Changes' : 'Submit Decision'}
+              </button>
+            </div>
           </div>
+
+          {/* AI Advisor for Decision */}
+          {showAIAdvisor && currentUser && (() => {
+            const member = getMemberById(currentUser);
+            return (
+              <div className="mt-4 animate-fade-in">
+                <AIChatPanel
+                  memberId={`${currentUser}-decisions`}
+                  memberName={member?.name ?? ownerName ?? 'Team Member'}
+                  memberRole={member?.role ?? ''}
+                  context={{
+                    decisionTitle: form.title,
+                    decisionDescription: form.description,
+                    decisionRationale: form.rationale,
+                    decisionCategory: form.category,
+                    kpis: member?.kpis,
+                    ownership: member?.singleThreadedOwnership,
+                  }}
+                  title="Decision AI Advisor"
+                  titleIcon="sparkles"
+                  compact={true}
+                  defaultCollapsed={false}
+                  suggestedPrompts={[
+                    'Help me think through the pros and cons',
+                    'What second-order effects should I consider?',
+                    'Who should I consult before deciding?',
+                    'What are the risks of this decision?',
+                    'How does this align with our $1B North Star?',
+                    'What would I need to see to reverse this decision?',
+                  ]}
+                />
+              </div>
+            );
+          })()}
         </div>
       )}
 

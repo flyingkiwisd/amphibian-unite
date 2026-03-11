@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutDashboard,
   Bot,
@@ -10,6 +10,7 @@ import {
   Map,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Scale,
   StickyNote,
   Search,
@@ -17,6 +18,8 @@ import {
   Trophy,
   BookOpen,
   Settings,
+  Check,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 
@@ -29,7 +32,24 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   currentUser: string | null;
   onOpenSearch?: () => void;
+  onSwitchProfile?: (userId: string) => void;
 }
+
+const tailwindColorMap: Record<string, string> = {
+  'bg-teal-500': '#14b8a6',
+  'bg-blue-500': '#3b82f6',
+  'bg-amber-500': '#f59e0b',
+  'bg-indigo-500': '#6366f1',
+  'bg-rose-500': '#f43f5e',
+  'bg-emerald-500': '#10b981',
+  'bg-violet-500': '#8b5cf6',
+  'bg-cyan-500': '#06b6d4',
+  'bg-orange-500': '#f97316',
+  'bg-sky-500': '#0ea5e9',
+  'bg-lime-500': '#84cc16',
+  'bg-pink-500': '#ec4899',
+  'bg-purple-500': '#a855f7',
+};
 
 const navItems: { label: string; icon: React.ElementType; view: ViewType; group: number }[] = [
   // Core 7
@@ -39,7 +59,6 @@ const navItems: { label: string; icon: React.ElementType; view: ViewType; group:
   { label: 'Decisions', icon: Scale, view: 'decisions', group: 1 },
   { label: 'Journal', icon: BookOpen, view: 'journal', group: 1 },
   { label: 'Team', icon: Users, view: 'team', group: 1 },
-  { label: '14 Agents', icon: Bot, view: 'agents', group: 1 },
   // More
   { label: 'Notes', icon: StickyNote, view: 'notes', group: 2 },
   { label: 'Roadmap', icon: Map, view: 'roadmap', group: 2 },
@@ -55,11 +74,30 @@ export function Sidebar({
   onToggleCollapse,
   currentUser,
   onOpenSearch,
+  onSwitchProfile,
 }: SidebarProps) {
   const user = teamMembers.find((m) => m.id === currentUser);
   const initials = user?.avatar ?? '??';
   const userName = user?.name ?? 'Unknown';
   const userRole = user?.shortRole ?? '';
+
+  const [showProfilePicker, setShowProfilePicker] = useState(false);
+  const profilePickerRef = useRef<HTMLDivElement>(null);
+
+  // Close profile picker when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profilePickerRef.current && !profilePickerRef.current.contains(e.target as Node)) {
+        setShowProfilePicker(false);
+      }
+    }
+    if (showProfilePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showProfilePicker]);
+
+  const activeMembers = teamMembers.filter((m) => m.status === 'active');
 
   const groups = [1, 2];
 
@@ -208,30 +246,154 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* User Section */}
-      <div style={{ borderTop: '1px solid #1e293b', padding: collapsed ? '16px 0' : '16px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 12, flexShrink: 0 }}>
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <div title={collapsed ? `${userName} · ${userRole}` : undefined} style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#f0fdfa', letterSpacing: '0.02em', boxShadow: '0 0 12px rgba(20, 184, 166, 0.25)' }}>
-            {initials}
-          </div>
-          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid #111827' }} />
-        </div>
-        {!collapsed && (
-          <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</span>
-              {userRole && (
-                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, backgroundColor: 'rgba(20, 184, 166, 0.15)', color: '#5eead4', border: '1px solid rgba(20, 184, 166, 0.3)', letterSpacing: '0.05em', flexShrink: 0 }}>
-                  {userRole}
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
-              Online
-            </div>
+      {/* User Section with Profile Switcher */}
+      <div ref={profilePickerRef} style={{ position: 'relative', flexShrink: 0 }}>
+        {/* Profile Picker Dropdown — appears above user section */}
+        {showProfilePicker && onSwitchProfile && (
+          <div style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: 0,
+            right: 0,
+            backgroundColor: '#111827',
+            border: '1px solid #1e293b',
+            borderRadius: collapsed ? 8 : 12,
+            marginBottom: 4,
+            maxHeight: 360,
+            overflowY: 'auto',
+            boxShadow: '0 -10px 40px rgba(0,0,0,0.5)',
+            zIndex: 100,
+            padding: '8px 0',
+          }}>
+            {!collapsed && (
+              <div style={{ padding: '6px 16px 10px', borderBottom: '1px solid #1e293b', marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ArrowRightLeft size={12} style={{ color: '#94a3b8' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Switch Profile</span>
+                </div>
+              </div>
+            )}
+            {activeMembers.map((member) => {
+              const isCurrent = member.id === currentUser;
+              const hexColor = tailwindColorMap[member.color] || '#14b8a6';
+              return (
+                <button
+                  key={member.id}
+                  onClick={() => {
+                    if (!isCurrent) {
+                      onSwitchProfile(member.id);
+                    }
+                    setShowProfilePicker(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: collapsed ? 0 : 10,
+                    width: '100%',
+                    padding: collapsed ? '8px 0' : '8px 16px',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    border: 'none',
+                    cursor: isCurrent ? 'default' : 'pointer',
+                    fontSize: 13,
+                    color: isCurrent ? '#5eead4' : '#94a3b8',
+                    backgroundColor: isCurrent ? 'rgba(20, 184, 166, 0.08)' : 'transparent',
+                    transition: 'background 0.15s, color 0.15s',
+                    fontFamily: 'inherit',
+                  }}
+                  onMouseEnter={(e) => { if (!isCurrent) { e.currentTarget.style.backgroundColor = '#1e293b'; e.currentTarget.style.color = '#e2e8f0'; }}}
+                  onMouseLeave={(e) => { if (!isCurrent) { e.currentTarget.style.backgroundColor = isCurrent ? 'rgba(20, 184, 166, 0.08)' : 'transparent'; e.currentTarget.style.color = isCurrent ? '#5eead4' : '#94a3b8'; }}}
+                  title={collapsed ? `${member.name} · ${member.shortRole}` : undefined}
+                >
+                  <div style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: `linear-gradient(135deg, ${hexColor}88, ${hexColor})`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#f0fdfa',
+                    flexShrink: 0,
+                  }}>
+                    {member.avatar}
+                  </div>
+                  {!collapsed && (
+                    <>
+                      <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                        <div style={{ fontSize: 13, fontWeight: isCurrent ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {member.name}
+                        </div>
+                        <div style={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {member.shortRole}
+                        </div>
+                      </div>
+                      {isCurrent && (
+                        <Check size={14} style={{ color: '#14b8a6', flexShrink: 0 }} />
+                      )}
+                    </>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
+
+        {/* Clickable User Section */}
+        <button
+          onClick={() => onSwitchProfile && setShowProfilePicker(!showProfilePicker)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: 12,
+            width: '100%',
+            padding: collapsed ? '16px 0' : '16px',
+            border: 'none',
+            borderTop: '1px solid #1e293b',
+            cursor: onSwitchProfile ? 'pointer' : 'default',
+            backgroundColor: showProfilePicker ? '#1e293b' : 'transparent',
+            transition: 'background 0.15s',
+            fontFamily: 'inherit',
+          }}
+          onMouseEnter={(e) => { if (onSwitchProfile) e.currentTarget.style.backgroundColor = '#1a2234'; }}
+          onMouseLeave={(e) => { if (onSwitchProfile) e.currentTarget.style.backgroundColor = showProfilePicker ? '#1e293b' : 'transparent'; }}
+          title={collapsed ? `${userName} · ${userRole} (click to switch)` : undefined}
+        >
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#f0fdfa', letterSpacing: '0.02em', boxShadow: '0 0 12px rgba(20, 184, 166, 0.25)' }}>
+              {initials}
+            </div>
+            <div style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid #111827' }} />
+          </div>
+          {!collapsed && (
+            <>
+              <div style={{ overflow: 'hidden', flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName}</span>
+                  {userRole && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, backgroundColor: 'rgba(20, 184, 166, 0.15)', color: '#5eead4', border: '1px solid rgba(20, 184, 166, 0.3)', letterSpacing: '0.05em', flexShrink: 0 }}>
+                      {userRole}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
+                  Online
+                </div>
+              </div>
+              {onSwitchProfile && (
+                <ChevronUp size={14} style={{
+                  color: '#64748b',
+                  flexShrink: 0,
+                  transition: 'transform 0.2s',
+                  transform: showProfilePicker ? 'rotate(180deg)' : 'rotate(0deg)',
+                }} />
+              )}
+            </>
+          )}
+        </button>
       </div>
     </aside>
   );
