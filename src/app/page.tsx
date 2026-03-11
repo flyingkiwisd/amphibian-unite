@@ -24,11 +24,12 @@ import { LPHealthView } from '@/components/views/LPHealthView';
 import { CompetitiveIntelView } from '@/components/views/CompetitiveIntelView';
 import { KnowledgeGraphView } from '@/components/views/KnowledgeGraphView';
 import { RoleDriftView } from '@/components/views/RoleDriftView';
+import { JournalView } from '@/components/views/JournalView';
 import { LoginScreen } from '@/components/LoginScreen';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useClerkAuth } from '@/hooks/useClerkAuth';
 
-export type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift';
+export type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal';
 
 export default function Home() {
   // Clerk auth — returns { isClerkActive, clerkUserId, isLoaded }
@@ -130,6 +131,7 @@ export default function Home() {
       case 'competitive-intel': return <CompetitiveIntelView currentUser={currentUser ?? 'james'} />;
       case 'knowledge-graph': return <KnowledgeGraphView currentUser={currentUser ?? 'james'} />;
       case 'role-drift': return <RoleDriftView currentUser={currentUser ?? 'james'} />;
+      case 'journal': return <JournalView currentUser={currentUser ?? 'james'} />;
       default: return <DashboardView onNavigate={handleNavigate} currentUser={currentUser ?? 'james'} />;
     }
   };

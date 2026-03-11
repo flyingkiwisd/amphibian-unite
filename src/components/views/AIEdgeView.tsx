@@ -1,6 +1,6 @@
 'use client';
 
-import { aiLayers as defaultAiLayers, edgeAssessment, productTargets, strategicPaths2030, yieldEnvironment } from '@/lib/data';
+import { aiLayers as defaultAiLayers, edgeAssessment, productTargets, strategicPaths2030, yieldEnvironment, memberIdToOwnerName } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
 import {
   Cpu,
@@ -62,7 +62,35 @@ const statusOptions = [
   { label: 'LOW', value: 'LOW', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
 ];
 
+const edgeRoleContributions: Record<string, string> = {
+  james: 'Strategic vision, product architecture, agent design',
+  ty: 'Portfolio decisions, risk governance, allocation engine',
+  timon: 'Risk dashboard, data pipeline, regime classifier, DeFi automation',
+  sahir: 'Manager research, strategy performance database, options modeling',
+  ross: 'Portfolio execution, SMA infrastructure, manager monitoring',
+  andrew: 'Dynamic Alpha business ownership, compliance, governance',
+  mark: 'Financial modeling, budget impact of AI investment',
+  todd: 'LP communication of AI edge, investor trust',
+  paola: 'Partnership sourcing, growth strategy alignment',
+  david: 'Fund operations support for AI systems',
+  thao: 'Project coordination for AI development',
+  nicole: 'Investor reporting on AI capabilities',
+  nick: 'Operational support for AI infrastructure',
+};
+
+// Maps layer index (0-based) to owning member IDs
+const layerOwnerMap: Record<number, string[]> = {
+  0: ['timon'],             // Layer 1: Regime Classification
+  1: ['timon', 'sahir'],    // Layer 2: Signal Generation
+  2: ['ty', 'sahir'],       // Layer 3: Dynamic Risk Management
+  3: ['ty', 'ross'],        // Layer 4: Execution Optimization
+  4: ['ty'],                // Layer 5: Manager Selection
+  5: ['james', 'timon'],    // Layer 6: Operational Efficiency / Agent Intelligence
+};
+
 export function AIEdgeView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? currentUser : null;
+
   const currentRating = edgeAssessment.bridgeV3Rating;
   const andrewRating = edgeAssessment.andrewConsensusRating;
   const targetRating = 8.5;
@@ -113,6 +141,27 @@ export function AIEdgeView({ currentUser }: { currentUser?: string }) {
           Not AI as marketing — AI as the operating system.
         </p>
       </div>
+
+      {/* ── Your Edge Role Card ── */}
+      {currentUser && (
+        <div
+          className="relative rounded-xl p-[1px] bg-gradient-to-r from-teal-500/50 via-blue-500/50 to-purple-500/50 animate-fade-in"
+          style={{ animationDelay: '50ms', opacity: 0 }}
+        >
+          <div className="rounded-xl bg-surface p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <Gauge className="w-5 h-5 text-accent" />
+              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider">
+                Your Edge Role
+              </h2>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+            </div>
+            <p className="text-base text-text-primary font-medium ml-8">
+              {ownerName} &mdash; {edgeRoleContributions[currentUser] || 'Supporting the team\'s path to 7/10'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Dual Edge Rating Banner ── */}
       <div className="glow-card bg-surface rounded-xl border border-border p-6 animate-fade-in" style={{ animationDelay: '75ms', opacity: 0 }}>
@@ -210,16 +259,29 @@ export function AIEdgeView({ currentUser }: { currentUser?: string }) {
           <h2 className="text-xl font-semibold text-text-primary">Three Non-Negotiables</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {edgeAssessment.threeNonNegotiables.map((nn, i) => (
-            <div key={i} className="glow-card bg-surface rounded-xl border border-red-500/20 p-5 hover:border-red-500/40 transition-all">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">#{i + 1}</span>
-                <span className="text-xs text-text-muted">Owner: {nn.owner}</span>
+          {edgeAssessment.threeNonNegotiables.map((nn, i) => {
+            const isNNOwned = ownerName ? nn.owner.includes(ownerName) : false;
+            return (
+              <div
+                key={i}
+                className={`glow-card bg-surface rounded-xl border p-5 transition-all ${
+                  isNNOwned
+                    ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30 hover:border-accent/50'
+                    : 'border-red-500/20 hover:border-red-500/40'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-bold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">#{i + 1}</span>
+                  <span className="text-xs text-text-muted">Owner: {nn.owner}</span>
+                  {isNNOwned && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider ml-auto">You</span>
+                  )}
+                </div>
+                <h3 className="text-sm font-semibold text-text-primary mb-2">{nn.name}</h3>
+                <p className="text-xs text-text-secondary leading-relaxed">{nn.detail}</p>
               </div>
-              <h3 className="text-sm font-semibold text-text-primary mb-2">{nn.name}</h3>
-              <p className="text-xs text-text-secondary leading-relaxed">{nn.detail}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -308,6 +370,8 @@ export function AIEdgeView({ currentUser }: { currentUser?: string }) {
         <div className="relative">
           {layers.map((layer, index) => {
             const Icon = layerIcons[index] || Cpu;
+            const layerOwners = layerOwnerMap[index] || [];
+            const isLayerOwned = currentUser ? layerOwners.includes(currentUser) : false;
             return (
               <div key={index} className="relative">
                 {index < layers.length - 1 && (
@@ -317,7 +381,11 @@ export function AIEdgeView({ currentUser }: { currentUser?: string }) {
                   </div>
                 )}
                 <div
-                  className={`glow-card bg-gradient-to-r ${layerGradient(index)} bg-surface rounded-xl border ${layerBorderColor(index)} p-5 transition-all duration-300 animate-fade-in ${index < layers.length - 1 ? 'mb-6' : ''}`}
+                  className={`glow-card bg-gradient-to-r ${layerGradient(index)} bg-surface rounded-xl border ${
+                    isLayerOwned
+                      ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                      : layerBorderColor(index)
+                  } p-5 transition-all duration-300 animate-fade-in ${index < layers.length - 1 ? 'mb-6' : ''}`}
                   style={{ animationDelay: `${500 + index * 80}ms`, opacity: 0 }}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -335,6 +403,9 @@ export function AIEdgeView({ currentUser }: { currentUser?: string }) {
                             />
                           </h3>
                         </div>
+                        {isLayerOwned && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+                        )}
                         <span className="text-green-400 font-mono text-sm font-medium bg-green-500/10 px-2 py-0.5 rounded">
                           <InlineText
                             value={layer.edge}

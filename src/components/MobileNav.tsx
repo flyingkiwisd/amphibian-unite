@@ -24,10 +24,11 @@ import {
   Radar,
   Network,
   UserCheck,
+  BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 
-type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift';
+type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal';
 
 interface MobileNavProps {
   currentView: string;
@@ -47,6 +48,7 @@ const moreTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
   { label: 'Leaderboard', icon: Trophy, view: 'leaderboard' },
   { label: 'Decisions', icon: Scale, view: 'decisions' },
   { label: 'Roadmap', icon: Map, view: 'roadmap' },
+  { label: 'Journal', icon: BookOpen, view: 'journal' },
   { label: 'Notes', icon: StickyNote, view: 'notes' },
   { label: 'Activity', icon: Activity, view: 'activity' },
   { label: 'AI Edge', icon: Cpu, view: 'ai-edge' },

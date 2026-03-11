@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineNumber, InlineText, EditBanner } from '@/components/InlineEdit';
+import { memberIdToOwnerName } from '@/lib/data';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data shape
@@ -155,6 +156,26 @@ export function CashRunwayView({ currentUser }: { currentUser?: string }) {
   );
   const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
 
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? null : null;
+
+  // ── Role-aware subtitle ──
+  const headerSubtitle = currentUser === 'mark'
+    ? 'Your financial command center \u2014 you own this.'
+    : currentUser === 'james'
+      ? "The financial health of the company you're building."
+      : 'Financial visibility for the entire team.';
+
+  // ── Role-aware focus priority ──
+  const focusPriority = currentUser === 'mark'
+    ? 'Your Priority: Keep burn below $90K/mo, hit break-even at $65M AUM'
+    : currentUser === 'james'
+      ? 'Your Priority: Grow AUM to $65M break-even, then $100M'
+      : currentUser === 'todd'
+        ? 'Your Priority: LP fundraising driving AUM growth'
+        : currentUser === 'paola'
+          ? 'Your Priority: Partnership revenue contribution'
+          : 'Team Priority: Extend runway while growing AUM';
+
   const currentAUM = data.kpi.aum.value;
   const breakEvenProgress = Math.min((currentAUM / data.breakEvenAUM) * 100, 100);
 
@@ -215,10 +236,22 @@ export function CashRunwayView({ currentUser }: { currentUser?: string }) {
           </h1>
         </div>
         <p className="text-text-secondary text-lg max-w-3xl">
-          Financial health dashboard. Track AUM, burn rate, revenue, and scenario-model
-          the path to break-even.
+          {headerSubtitle}
         </p>
       </div>
+
+      {/* ── Your Focus Card ── */}
+      {ownerName && (
+        <div
+          className="border-l-2 border-accent bg-accent/5 rounded-r-xl px-4 py-3 animate-fade-in"
+          style={{ animationDelay: '25ms', opacity: 0 }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+            <span className="text-sm text-text-primary font-medium">{focusPriority}</span>
+          </div>
+        </div>
+      )}
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -482,12 +515,20 @@ export function CashRunwayView({ currentUser }: { currentUser?: string }) {
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className={`text-sm font-semibold ${scenario.color}`}>
-                    <InlineText
-                      value={scenario.name}
-                      onSave={(v) => updateScenario(idx, 'name', v)}
-                    />
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className={`text-sm font-semibold ${scenario.color}`}>
+                      <InlineText
+                        value={scenario.name}
+                        onSave={(v) => updateScenario(idx, 'name', v)}
+                      />
+                    </h3>
+                    {idx === 0 && currentUser === 'mark' && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">CFO Pick</span>
+                    )}
+                    {idx === 1 && currentUser === 'james' && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">CEO Target</span>
+                    )}
+                  </div>
                   <span
                     className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 ${scenario.badgeColor}`}
                   >
@@ -563,10 +604,19 @@ export function CashRunwayView({ currentUser }: { currentUser?: string }) {
         className="glow-card bg-surface border border-border rounded-xl p-6 animate-fade-in"
         style={{ animationDelay: '600ms', opacity: 0 }}
       >
-        <h3 className="text-sm font-semibold text-text-primary mb-3">Key Assumptions</h3>
+        <div className="flex items-center gap-3 mb-3">
+          <h3 className="text-sm font-semibold text-text-primary">Key Assumptions</h3>
+          {currentUser === 'mark' && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You own these</span>
+          )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-text-secondary">
           {data.assumptions.map((assumption, idx) => (
-            <div key={idx} className="bg-surface-2 rounded-lg p-3">
+            <div key={idx} className={`rounded-lg p-3 ${
+              currentUser === 'mark'
+                ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border border-accent/30'
+                : 'bg-surface-2'
+            }`}>
               <p className="text-text-muted mb-1">{assumption.title}</p>
               <p className="text-text-primary font-semibold">
                 <InlineText

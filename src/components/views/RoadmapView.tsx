@@ -13,7 +13,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { roadmapPhases } from '@/lib/data';
+import { roadmapPhases, memberIdToOwnerName } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, InlineSelect, EditBanner } from '@/components/InlineEdit';
@@ -95,7 +95,45 @@ const statusOptions = [
   { label: 'Future', value: 'future', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
 ];
 
+const roadmapRoleMessages: Record<string, string> = {
+  james: 'You own the vision and $1B trajectory',
+  ty: 'You own portfolio edge and risk governance',
+  timon: 'You own the AI stack and platform',
+  mark: 'You own financial clarity and runway',
+  todd: 'You own LP trust and IR',
+  ross: 'You own cross-functional execution and portfolio ops',
+  paola: 'You own partnerships and growth pipeline',
+  andrew: 'You own competitive intel and governance',
+  sahir: 'You own strategy performance and operations',
+  david: 'You own fund administration and operations',
+  thao: 'You own project coordination and task management',
+  nicole: 'You support investor relations and communications',
+  nick: 'You support fund operations and reporting',
+};
+
+const proveItActionOwners: Record<number, string[]> = {
+  0: ['ty', 'ross'],           // BTC Alpha: hit 20 bps/month
+  1: ['ross', 'ty'],           // Map all 12 BTC yield sources
+  2: ['james'],                // Hire COO by June 2026
+  3: ['james'],                // CTO candidates identified
+  4: ['ross', 'ty'],           // A9 audit underway
+  5: ['james', 'andrew'],      // Dynamic Alpha: name + structure
+  6: ['timon', 'ty'],          // Risk dashboard v1 deployed
+  7: ['timon', 'sahir'],       // Regime classifier v0.1
+};
+
+const ninetyDayGateOwners: Record<number, string[]> = {
+  0: ['ty', 'ross'],           // BTC Alpha > 15 bps/month
+  1: ['james'],                // COO offer extended
+  2: ['james'],                // CTO search engaged
+  3: ['james', 'andrew', 'ty'],// Dynamic Alpha structure approved
+  4: ['ty', 'timon'],          // Risk limits published
+  5: ['sahir', 'timon'],       // Strategy performance database
+};
+
 export function RoadmapView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? currentUser : null;
+
   const { data: phases, setData: setPhases, hasEdits, resetAll } = useEditableStore(
     'amphibian-unite-roadmap',
     roadmapPhases
@@ -141,6 +179,25 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
           Path from $100M to $1B+ AUM &mdash; every phase has clear milestones and edge targets
         </p>
       </div>
+
+      {/* ── Personal Roadmap Summary ── */}
+      {currentUser && roadmapRoleMessages[currentUser] && (
+        <div
+          className="border-l-4 border-l-accent bg-accent/5 rounded-xl p-5 animate-fade-in"
+          style={{ animationDelay: '50ms' }}
+        >
+          <div className="flex items-center gap-3 mb-1.5">
+            <Target className="w-5 h-5 text-accent" />
+            <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+              Your Role in the Roadmap
+            </h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+          </div>
+          <p className="text-base text-accent font-medium ml-8">
+            {ownerName} &mdash; {roadmapRoleMessages[currentUser]}
+          </p>
+        </div>
+      )}
 
       {/* ── AUM Trajectory Visualization ── */}
       <div
@@ -302,6 +359,9 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
                           options={statusOptions}
                           onSave={(v) => updatePhase(index, 'status', v)}
                         />
+                        {isActive && currentUser === 'james' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You Own This Phase</span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -350,20 +410,30 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
                             </h4>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {proveItActions.map((action, i) => (
-                              <div
-                                key={i}
-                                className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-surface-2 transition-colors"
-                              >
-                                <CheckCircle
-                                  size={14}
-                                  className="mt-0.5 flex-shrink-0 text-accent"
-                                />
-                                <span className="text-sm text-text-secondary leading-snug">
-                                  {action}
-                                </span>
-                              </div>
-                            ))}
+                            {proveItActions.map((action, i) => {
+                              const isOwned = currentUser ? (proveItActionOwners[i] || []).includes(currentUser) : false;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex items-start gap-2.5 p-2 rounded-lg transition-colors ${
+                                    isOwned
+                                      ? 'border-l-2 border-l-accent bg-accent/5 ring-1 ring-accent/20'
+                                      : 'hover:bg-surface-2'
+                                  }`}
+                                >
+                                  <CheckCircle
+                                    size={14}
+                                    className="mt-0.5 flex-shrink-0 text-accent"
+                                  />
+                                  <span className={`text-sm leading-snug ${isOwned ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
+                                    {action}
+                                  </span>
+                                  {isOwned && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider flex-shrink-0 ml-auto">You</span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -377,16 +447,27 @@ export function RoadmapView({ currentUser }: { currentUser?: string }) {
                           </div>
                           <div className="bg-surface-2 rounded-xl p-4 border border-border">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                              {ninetyDayGate.map((gate, i) => (
-                                <div key={i} className="flex items-start gap-2.5">
-                                  <div className="mt-1 flex-shrink-0">
-                                    <div className="h-2.5 w-2.5 rounded-full border-2 border-accent-amber bg-accent-amber/20" />
+                              {ninetyDayGate.map((gate, i) => {
+                                const isOwned = currentUser ? (ninetyDayGateOwners[i] || []).includes(currentUser) : false;
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`flex items-start gap-2.5 ${
+                                      isOwned ? 'border-l-2 border-l-accent bg-accent/5 rounded-lg p-1.5 ring-1 ring-accent/20' : ''
+                                    }`}
+                                  >
+                                    <div className="mt-1 flex-shrink-0">
+                                      <div className="h-2.5 w-2.5 rounded-full border-2 border-accent-amber bg-accent-amber/20" />
+                                    </div>
+                                    <span className={`text-sm leading-snug ${isOwned ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
+                                      {gate}
+                                    </span>
+                                    {isOwned && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider flex-shrink-0 ml-auto">You</span>
+                                    )}
                                   </div>
-                                  <span className="text-sm text-text-secondary leading-snug">
-                                    {gate}
-                                  </span>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         </div>

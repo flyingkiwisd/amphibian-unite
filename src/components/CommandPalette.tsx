@@ -23,6 +23,7 @@ import {
   Radar,
   Network,
   UserCheck,
+  BookOpen,
 } from 'lucide-react';
 import { teamMembers, agents, okrs, kpis } from '@/lib/data';
 
@@ -129,6 +130,14 @@ const navigationItems: SearchResult[] = [
     subtitle: 'AI-powered meeting prep and action tracking',
     category: 'Navigation',
     action: 'meeting-intel',
+  },
+  {
+    id: 'nav-journal',
+    icon: <BookOpen className="w-4 h-4" />,
+    title: 'Journal',
+    subtitle: 'Morning check-in, EOD reflection, weekly pulse',
+    category: 'Navigation',
+    action: 'journal',
   },
   {
     id: 'nav-what-changed',

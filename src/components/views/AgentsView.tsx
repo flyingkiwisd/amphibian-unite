@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { agents as defaultAgents } from '@/lib/data';
+import { agents as defaultAgents, memberIdToOwnerName } from '@/lib/data';
 import type { Agent } from '@/lib/data';
 import { exportToPdf } from '@/lib/exportPdf';
 import { useEditableStore } from '@/lib/useEditableStore';
@@ -103,18 +103,48 @@ const priorityOptions = [
   { label: 'Low', value: 'low', color: 'bg-gray-500/15 text-gray-400 border border-gray-500/30' },
 ];
 
+const agentOwnerMap: Record<string, string> = {
+  'task-commander': 'thao',
+  'slack-signal': 'ty',
+  'north-star': 'james',
+  'identity': 'james',
+  'governance': 'james',
+  'okr-engine': 'james',
+  'ai-edge': 'ty',
+  'lp-trust': 'todd',
+  'culture': 'james',
+  'portfolio-intel': 'ty',
+  'financial': 'mark',
+  'knowledge': 'james',
+  'roadmap': 'james',
+  'hiring': 'james',
+};
+
 export function AgentsView({ currentUser }: { currentUser?: string }) {
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? currentUser : null;
+
   const { data: agentsData, setData: setAgents, hasEdits, resetAll } = useEditableStore(
     'amphibian-unite-agents',
     defaultAgents
   );
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [showMyAgentsOnly, setShowMyAgentsOnly] = useState(false);
   const selectedAgent = selectedAgentId ? agentsData.find((a) => a.id === selectedAgentId) || null : null;
 
   const activeCount = agentsData.filter((a) => a.status === 'active').length;
   const buildingCount = agentsData.filter((a) => a.status === 'building').length;
   const plannedCount = agentsData.filter((a) => a.status === 'planned').length;
+
+  const myAgents = currentUser
+    ? agentsData.filter((a) => agentOwnerMap[a.id] === currentUser)
+    : [];
+  const myActiveCount = myAgents.filter((a) => a.status === 'active').length;
+  const myBuildingCount = myAgents.filter((a) => a.status === 'building').length;
+
+  const displayedAgents = showMyAgentsOnly && currentUser
+    ? agentsData.filter((a) => agentOwnerMap[a.id] === currentUser)
+    : agentsData;
 
   const handleDownloadPDF = (agent: Agent) => {
     exportToPdf('agent-detail-panel', `amphibian-unite-agent-${agent.id}`);
@@ -158,17 +188,38 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
 
       {/* Header */}
       <div className="animate-fade-in">
-        <h1 className="text-3xl font-bold text-text-primary">
-          The <span className="gradient-text">14 Agents</span>
-        </h1>
-        <p className="mt-2 text-text-secondary text-lg">
-          AI-native intelligence powering every layer of Amphibian Capital
-        </p>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-text-primary">
+              The <span className="gradient-text">14 Agents</span>
+            </h1>
+            <p className="mt-2 text-text-secondary text-lg">
+              AI-native intelligence powering every layer of Amphibian Capital
+            </p>
+          </div>
+          {currentUser && myAgents.length > 0 && (
+            <button
+              onClick={() => setShowMyAgentsOnly(!showMyAgentsOnly)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 ${
+                showMyAgentsOnly
+                  ? 'bg-accent/15 text-accent border-accent/30 shadow-[0_0_12px_rgba(20,184,166,0.15)]'
+                  : 'bg-surface text-text-secondary border-border hover:border-border-2 hover:text-text-primary'
+              }`}
+            >
+              My Agents
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                showMyAgentsOnly ? 'bg-accent/20 text-accent' : 'bg-surface-3 text-text-muted'
+              }`}>
+                {myAgents.length}
+              </span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Bar */}
       <div
-        className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in"
+        className={`grid grid-cols-2 ${currentUser && myAgents.length > 0 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 animate-fade-in`}
         style={{ animationDelay: '100ms' }}
       >
         {[
@@ -176,10 +227,15 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
           { label: 'Active', value: activeCount, color: 'text-green-400' },
           { label: 'Building', value: buildingCount, color: 'text-amber-400' },
           { label: 'Planned', value: plannedCount, color: 'text-gray-400' },
+          ...(currentUser && myAgents.length > 0
+            ? [{ label: `Your Agents: ${myActiveCount} active, ${myBuildingCount} building`, value: myAgents.length, color: 'text-accent' }]
+            : []),
         ].map((stat) => (
           <div
             key={stat.label}
-            className="bg-surface rounded-xl border border-border p-4 text-center"
+            className={`bg-surface rounded-xl border p-4 text-center ${
+              stat.color === 'text-accent' ? 'border-accent/30 bg-accent/5' : 'border-border'
+            }`}
           >
             <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
             <div className="text-sm text-text-muted mt-1">{stat.label}</div>
@@ -199,12 +255,17 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {agentsData.map((agent, index) => {
+          {displayedAgents.map((agent, index) => {
             const IconComponent = iconMap[agent.icon] || Compass;
+            const isOwnedByUser = currentUser ? agentOwnerMap[agent.id] === currentUser : false;
             return (
               <div
                 key={agent.id}
-                className="glow-card group bg-surface rounded-xl border border-border cursor-pointer transition-all duration-300 hover:border-border-2 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 animate-fade-in"
+                className={`glow-card group bg-surface rounded-xl border cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 animate-fade-in ${
+                  isOwnedByUser
+                    ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                    : 'border-border hover:border-border-2'
+                }`}
                 style={{ animationDelay: `${(index + 2) * 75}ms`, opacity: 0 }}
                 onClick={() => setSelectedAgentId(agent.id)}
               >
@@ -222,12 +283,17 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
                       <IconComponent className={`w-5 h-5 ${agent.color}`} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold text-text-primary leading-tight">
-                        <InlineText
-                          value={agent.name}
-                          onSave={(v) => updateAgent(agent.id, 'name', v)}
-                        />
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-text-primary leading-tight">
+                          <InlineText
+                            value={agent.name}
+                            onSave={(v) => updateAgent(agent.id, 'name', v)}
+                          />
+                        </h3>
+                        {isOwnedByUser && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider flex-shrink-0">Yours</span>
+                        )}
+                      </div>
                       <p className="text-xs text-text-muted mt-1 line-clamp-2 leading-relaxed">
                         <InlineText
                           value={agent.description}

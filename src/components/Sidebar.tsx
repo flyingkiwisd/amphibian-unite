@@ -26,10 +26,11 @@ import {
   Radar,
   Network,
   UserCheck,
+  BookOpen,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 
-type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift';
+type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal';
 
 interface SidebarProps {
   currentView: string;
@@ -51,6 +52,7 @@ const navItems: { label: string; icon: React.ElementType; view: ViewType; group:
   { label: 'Leaderboard', icon: Trophy, view: 'leaderboard', group: 2 },
   { label: 'Accountability', icon: ClipboardCheck, view: 'accountability', group: 2 },
   { label: 'Meeting Intel', icon: CalendarClock, view: 'meeting-intel', group: 2 },
+  { label: 'Journal', icon: BookOpen, view: 'journal', group: 3 },
   { label: 'Notes', icon: StickyNote, view: 'notes', group: 3 },
   { label: 'Activity', icon: Activity, view: 'activity', group: 3 },
   { label: 'AI Edge', icon: Cpu, view: 'ai-edge', group: 3 },

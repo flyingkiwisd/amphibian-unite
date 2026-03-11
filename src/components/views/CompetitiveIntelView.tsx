@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, InlineSelect, EditBanner } from '@/components/InlineEdit';
+import { memberIdToOwnerName } from '@/lib/data';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -177,12 +178,48 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
     defaultData
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showMyWatchList, setShowMyWatchList] = useState(false);
   const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
 
-  const filteredInsights =
-    selectedCategory === 'all'
-      ? data.insights
-      : data.insights.filter((i) => i.category === selectedCategory);
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? null : null;
+
+  // ── Competitor watch owner mapping ──
+  // Map competitor IDs to array of team member IDs who should track them
+  const competitorWatchMap: Record<string, string[]> = {
+    'c-1': ['james', 'andrew'],    // Galaxy Digital
+    'c-2': ['ty', 'andrew'],       // Polychain Capital
+    'c-3': ['james', 'ty'],        // Pantera Capital
+    'c-4': ['ty', 'ross'],         // Arca
+    'c-5': ['andrew', 'todd'],     // Bitwise
+    'c-6': ['james', 'paola'],     // CoinFund
+  };
+
+  const isMyCompetitor = (competitorId: string) =>
+    currentUser ? (competitorWatchMap[competitorId] ?? []).includes(currentUser) : false;
+
+  // Map competitor names to IDs for signal matching
+  const competitorNameToId: Record<string, string> = {};
+  data.competitors.forEach((c) => {
+    competitorNameToId[c.name] = c.id;
+  });
+
+  const isSignalRelevant = (insight: IntelInsight) => {
+    if (!currentUser) return false;
+    const compId = Object.entries(competitorNameToId).find(
+      ([name]) => insight.firm.includes(name) || name.includes(insight.firm)
+    )?.[1];
+    return compId ? isMyCompetitor(compId) : false;
+  };
+
+  const myCompetitors = data.competitors.filter((c) => isMyCompetitor(c.id));
+  const myWatchCount = myCompetitors.length;
+  const myRelevantSignals = data.insights.filter(isSignalRelevant);
+
+  const filteredInsights = data.insights.filter((i) => {
+    const categoryMatch = selectedCategory === 'all' || i.category === selectedCategory;
+    const watchMatch = !showMyWatchList || isSignalRelevant(i);
+    return categoryMatch && watchMatch;
+  });
 
   const highImpactCount = data.insights.filter((i) => i.impact === 'High').length;
   const weeklyCount = data.insights.filter((i) => {
@@ -274,6 +311,23 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
         </p>
       </div>
 
+      {/* ── Personal Intel Summary ── */}
+      {ownerName && myWatchCount > 0 && (
+        <div
+          className="border-l-2 border-accent bg-accent/5 rounded-r-xl px-4 py-3 animate-fade-in"
+          style={{ animationDelay: '50ms', opacity: 0 }}
+        >
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+            <span className="text-sm text-text-primary font-medium">
+              Your Watch List: <span className="text-accent font-bold">{myWatchCount}</span> competitors
+              <span className="text-text-muted mx-2">|</span>
+              <span className="text-accent font-bold">{myRelevantSignals.length}</span> signals relevant to you this month
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── Summary Bar ── */}
       <div
         className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in"
@@ -313,8 +367,14 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {data.competitors.map((c) => (
-            <div key={c.id} className="group/comp bg-surface-2 rounded-lg p-3 relative">
+          {data.competitors.map((c) => {
+            const tracking = isMyCompetitor(c.id);
+            return (
+            <div key={c.id} className={`group/comp rounded-lg p-3 relative ${
+              tracking
+                ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border border-accent/30'
+                : 'bg-surface-2'
+            }`}>
               <button
                 onClick={() => deleteCompetitor(c.id)}
                 className="absolute top-2 right-2 p-1 rounded text-text-muted/30 opacity-0 group-hover/comp:opacity-100 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
@@ -322,12 +382,17 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
               >
                 <Trash2 className="w-3 h-3" />
               </button>
-              <h3 className="text-sm font-semibold text-text-primary">
-                <InlineText
-                  value={c.name}
-                  onSave={(v) => updateCompetitor(c.id, 'name', v)}
-                />
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-text-primary">
+                  <InlineText
+                    value={c.name}
+                    onSave={(v) => updateCompetitor(c.id, 'name', v)}
+                  />
+                </h3>
+                {tracking && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">Tracking</span>
+                )}
+              </div>
               <p className="text-xs text-text-muted mt-1">
                 <InlineText
                   value={c.strategyFocus}
@@ -342,7 +407,8 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
                 />
               </p>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -379,6 +445,18 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
             </button>
           );
         })}
+        {currentUser && myWatchCount > 0 && (
+          <button
+            onClick={() => setShowMyWatchList(!showMyWatchList)}
+            className={`text-xs px-3 py-1.5 rounded-lg transition-all ${
+              showMyWatchList
+                ? 'bg-accent/20 text-accent border border-accent/30'
+                : 'bg-surface-2 text-text-muted hover:text-text-secondary border border-transparent'
+            }`}
+          >
+            My Watch List ({myWatchCount})
+          </button>
+        )}
         <button
           onClick={addSignal}
           className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30 transition-all"
@@ -398,11 +476,16 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
           const impConf = impactConfig[insight.impact];
           const CatIcon = catConf.icon;
           const isExpanded = expandedInsight === insight.id;
+          const relevant = isSignalRelevant(insight);
 
           return (
             <div
               key={insight.id}
-              className="group/signal w-full text-left glow-card bg-surface border border-border rounded-xl p-5 hover:border-border-2 transition-all duration-300"
+              className={`group/signal w-full text-left glow-card bg-surface border rounded-xl p-5 hover:border-border-2 transition-all duration-300 ${
+                relevant
+                  ? 'border-l-2 border-l-accent border-t border-r border-b border-t-border border-r-border border-b-border'
+                  : 'border border-border'
+              }`}
             >
               <div
                 className="flex flex-col sm:flex-row sm:items-start gap-4 cursor-pointer"
@@ -443,6 +526,9 @@ export function CompetitiveIntelView({ currentUser }: { currentUser?: string }) 
                           <Clock className="w-3 h-3" />
                           {insight.timestamp}
                         </span>
+                        {relevant && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">Relevant to you</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

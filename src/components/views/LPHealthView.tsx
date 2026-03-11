@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useEditableStore } from '@/lib/useEditableStore';
 import { InlineText, InlineNumber, InlineSelect, EditBanner } from '@/components/InlineEdit';
+import { memberIdToOwnerName } from '@/lib/data';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -234,13 +235,45 @@ export function LPHealthView({ currentUser }: { currentUser?: string }) {
     defaultLPs
   );
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showMyLPs, setShowMyLPs] = useState(false);
   const [expandedLP, setExpandedLP] = useState<string | null>(null);
 
+  const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? null : null;
+
+  // ── LP relationship owner mapping ──
+  // todd owns most LP relationships as President & IR
+  // paola owns some through BD partnerships
+  const lpOwnerMap: Record<string, string> = {
+    'lp-1': 'todd',     // Summit Capital
+    'lp-2': 'todd',     // Horizon Partners
+    'lp-3': 'james',    // Blue Ridge Family Office (Meridian-like)
+    'lp-4': 'todd',     // Pacific Ventures (Atlas-like)
+    'lp-5': 'paola',    // Atlas Institutional (Pinnacle-like)
+    'lp-6': 'todd',     // Nordic Capital (Sterling-like)
+    'lp-7': 'paola',    // Meridian Trust (Vantage-like)
+    'lp-8': 'james',    // Cornerstone Holdings (Nexus-like)
+  };
+
+  const isMyLP = (lpId: string) => currentUser ? lpOwnerMap[lpId] === currentUser : false;
+
+  const myLPs = lpList.filter((lp) => isMyLP(lp.id));
+  const myLPCount = myLPs.length;
+
+  // Parse AUM for personal summary (extract number from strings like "$8.5M")
+  const myLPAum = myLPs.reduce((sum, lp) => {
+    const match = lp.aumCommitted.match(/\$?([\d.]+)/);
+    return sum + (match ? parseFloat(match[1]) : 0);
+  }, 0);
+  const myLPAvgHealth = myLPs.length > 0
+    ? Math.round(myLPs.reduce((sum, lp) => sum + lp.healthScore, 0) / myLPs.length)
+    : 0;
+
   const sortedLPs = [...lpList].sort((a, b) => a.healthScore - b.healthScore);
-  const filteredLPs =
-    filterStatus === 'all'
-      ? sortedLPs
-      : sortedLPs.filter((lp) => lp.status === filterStatus);
+  const filteredLPs = sortedLPs.filter((lp) => {
+    const statusMatch = filterStatus === 'all' || lp.status === filterStatus;
+    const myMatch = !showMyLPs || isMyLP(lp.id);
+    return statusMatch && myMatch;
+  });
 
   const avgScore = lpList.length > 0
     ? Math.round(lpList.reduce((sum, lp) => sum + lp.healthScore, 0) / lpList.length)
@@ -300,6 +333,25 @@ export function LPHealthView({ currentUser }: { currentUser?: string }) {
           satisfaction, and proactively prevent churn.
         </p>
       </div>
+
+      {/* ── Personal LP Summary ── */}
+      {ownerName && myLPCount > 0 && (
+        <div
+          className="border-l-2 border-accent bg-accent/5 rounded-r-xl px-4 py-3 animate-fade-in"
+          style={{ animationDelay: '50ms', opacity: 0 }}
+        >
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">You</span>
+            <span className="text-sm text-text-primary font-medium">
+              Your LP Portfolio: <span className="text-accent font-bold">{myLPCount}</span> LPs
+              <span className="text-text-muted mx-2">|</span>
+              <span className="text-accent font-bold">${myLPAum.toFixed(1)}M</span> AUM
+              <span className="text-text-muted mx-2">|</span>
+              Avg Health: <span className={`font-bold ${myLPAvgHealth >= 70 ? 'text-success' : myLPAvgHealth >= 40 ? 'text-warning' : 'text-danger'}`}>{myLPAvgHealth}</span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Overall Health Summary ── */}
       <div
@@ -374,6 +426,18 @@ export function LPHealthView({ currentUser }: { currentUser?: string }) {
             {status === 'all' ? 'All LPs' : status}
           </button>
         ))}
+        {currentUser && myLPCount > 0 && (
+          <button
+            onClick={() => setShowMyLPs(!showMyLPs)}
+            className={`text-xs px-3 py-1.5 rounded-lg transition-all ${
+              showMyLPs
+                ? 'bg-accent/20 text-accent border border-accent/30'
+                : 'bg-surface-2 text-text-muted hover:text-text-secondary border border-transparent'
+            }`}
+          >
+            My LPs ({myLPCount})
+          </button>
+        )}
         <button
           onClick={addLP}
           className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30 transition-all"
@@ -392,13 +456,18 @@ export function LPHealthView({ currentUser }: { currentUser?: string }) {
           const config = statusConfig[lp.status];
           const StatusIcon = config.icon;
           const isExpanded = expandedLP === lp.id;
+          const lpIsMine = isMyLP(lp.id);
+          const urgentContact = lpIsMine && lp.daysSinceContact > 14;
 
           return (
             <div
               key={lp.id}
               className={`w-full text-left glow-card bg-surface border rounded-xl p-5 transition-all duration-300 hover:border-border-2 ${
-                isExpanded ? config.border : 'border-border'
-              }`}
+                lpIsMine
+                  ? 'ring-2 ring-accent/40 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-accent/5 border-accent/30'
+                  : isExpanded ? config.border : 'border-border'
+              } ${urgentContact ? 'animate-pulse-subtle' : ''}`}
+              style={urgentContact ? { animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' } : undefined}
             >
               <div
                 className="flex flex-col sm:flex-row sm:items-center gap-4 cursor-pointer"
@@ -408,12 +477,17 @@ export function LPHealthView({ currentUser }: { currentUser?: string }) {
                 <div className="flex items-center gap-3 sm:w-56 shrink-0">
                   <StatusIcon className={`w-5 h-5 shrink-0 ${config.color}`} />
                   <div>
-                    <h3 className="text-sm font-semibold text-text-primary">
-                      <InlineText
-                        value={lp.name}
-                        onSave={(v) => updateLP(lp.id, 'name', v)}
-                      />
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-text-primary">
+                        <InlineText
+                          value={lp.name}
+                          onSave={(v) => updateLP(lp.id, 'name', v)}
+                        />
+                      </h3>
+                      {lpIsMine && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">Yours</span>
+                      )}
+                    </div>
                     <InlineSelect
                       value={lp.status}
                       options={statusOptions}
@@ -459,7 +533,7 @@ export function LPHealthView({ currentUser }: { currentUser?: string }) {
                       />
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className={`text-right ${urgentContact ? 'border border-danger/40 rounded-lg px-2 py-1 bg-danger/5' : ''}`}>
                     <p className="text-xs text-text-muted">Last Contact</p>
                     <p className={`text-sm font-medium ${
                       lp.daysSinceContact > 30
@@ -473,6 +547,9 @@ export function LPHealthView({ currentUser }: { currentUser?: string }) {
                         onSave={(v) => updateLP(lp.id, 'lastContact', v)}
                       />
                     </p>
+                    {urgentContact && (
+                      <p className="text-[10px] text-danger font-semibold mt-0.5">Overdue!</p>
+                    )}
                   </div>
                   <button
                     onClick={(e) => {
