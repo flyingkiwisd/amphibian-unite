@@ -29,6 +29,8 @@ import { SettingsView } from '@/components/views/SettingsView';
 import { LoginScreen } from '@/components/LoginScreen';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useClerkAuth } from '@/hooks/useClerkAuth';
+import { useToast } from '@/components/Toast';
+import { memberIdToOwnerName } from '@/lib/data';
 
 export type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal' | 'settings';
 
@@ -49,10 +51,53 @@ export default function Home() {
   const currentUser = isClerkActive ? clerkMemberId : localUser;
   const isAuthenticated = isClerkActive ? !!clerkMemberId : isLoggedIn;
 
+  const toast = useToast();
+
+  // Welcome toast on login
+  const [hasShownWelcome, setHasShownWelcome] = useState(false);
+  useEffect(() => {
+    if (isAuthenticated && currentUser && !hasShownWelcome) {
+      const name = memberIdToOwnerName[currentUser] ?? currentUser;
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+      toast.success(`${greeting}, ${name}`, 'Welcome to Amphibian Unite');
+      setHasShownWelcome(true);
+    }
+  }, [isAuthenticated, currentUser, hasShownWelcome, toast]);
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Don't intercept if user is typing in an input
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Cmd/Ctrl+K — Command palette
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       setCommandPaletteOpen(prev => !prev);
+      return;
+    }
+
+    // Alt+number shortcuts for quick navigation
+    if (e.altKey && !e.metaKey && !e.ctrlKey) {
+      const shortcuts: Record<string, ViewType> = {
+        '1': 'dashboard',
+        '2': 'tasks',
+        '3': 'okrs',
+        '4': 'agents',
+        '5': 'journal',
+        '6': 'team',
+        '7': 'settings',
+      };
+      if (shortcuts[e.key]) {
+        e.preventDefault();
+        setCurrentView(shortcuts[e.key]);
+        return;
+      }
+    }
+
+    // Escape closes command palette
+    if (e.key === 'Escape') {
+      setCommandPaletteOpen(false);
     }
   }, []);
 

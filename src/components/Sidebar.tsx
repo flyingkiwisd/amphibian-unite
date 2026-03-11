@@ -81,7 +81,7 @@ export function Sidebar({
   const userName = user?.name ?? 'Unknown';
   const userRole = user?.shortRole ?? '';
 
-  const groups = [1, 2, 3, 4];
+  const groups = [1, 2, 3, 4, 5];
 
   return (
     <aside

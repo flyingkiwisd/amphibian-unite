@@ -120,6 +120,59 @@ const agentOwnerMap: Record<string, string> = {
   'hiring': 'james',
 };
 
+function getAgentHealthMetrics(agent: Agent) {
+  const statusScores: Record<string, number> = { active: 95, building: 60, planned: 0 };
+  const uptime = statusScores[agent.status] ?? 0;
+  const capCount = agent.capabilities.length;
+  const dataScore = Math.min(100, agent.dataSourcesConnected.length * 25);
+
+  return [
+    { label: 'Uptime', value: agent.status === 'active' ? `${uptime}%` : '—', color: uptime >= 90 ? 'text-green-400' : uptime >= 50 ? 'text-amber-400' : 'text-text-muted' },
+    { label: 'Capabilities', value: capCount, color: capCount >= 5 ? 'text-blue-400' : capCount >= 3 ? 'text-amber-400' : 'text-text-muted' },
+    { label: 'Data Score', value: agent.status !== 'planned' ? `${dataScore}%` : '—', color: dataScore >= 75 ? 'text-green-400' : dataScore >= 50 ? 'text-amber-400' : 'text-text-muted' },
+  ];
+}
+
+const agentActivityLog: Record<string, { text: string; time: string; dotColor: string }[]> = {
+  'task-commander': [
+    { text: 'Synced 12 tasks from Supabase', time: '2h ago', dotColor: 'bg-green-400' },
+    { text: 'Auto-assigned 3 tasks based on ownership rules', time: '4h ago', dotColor: 'bg-blue-400' },
+    { text: 'Flagged 2 overdue tasks for review', time: '1d ago', dotColor: 'bg-amber-400' },
+  ],
+  'north-star': [
+    { text: 'Updated AUM tracking to $85M', time: '6h ago', dotColor: 'bg-green-400' },
+    { text: 'Refreshed edge rating calculation', time: '1d ago', dotColor: 'bg-blue-400' },
+    { text: 'Generated weekly north star report', time: '3d ago', dotColor: 'bg-teal-400' },
+  ],
+  'slack-signal': [
+    { text: 'Processed 47 Slack messages', time: '1h ago', dotColor: 'bg-green-400' },
+    { text: 'Extracted 3 action items from #strategy', time: '3h ago', dotColor: 'bg-blue-400' },
+    { text: 'Flagged alignment issue in #product', time: '1d ago', dotColor: 'bg-amber-400' },
+  ],
+  'portfolio-intel': [
+    { text: 'Scanned 8 portfolio positions', time: '2h ago', dotColor: 'bg-green-400' },
+    { text: 'Alert: BTC correlation shift detected', time: '5h ago', dotColor: 'bg-rose-400' },
+    { text: 'Updated risk-adjusted returns', time: '1d ago', dotColor: 'bg-blue-400' },
+  ],
+  'financial': [
+    { text: 'Updated runway projections', time: '4h ago', dotColor: 'bg-green-400' },
+    { text: 'Reconciled Q1 expense categories', time: '1d ago', dotColor: 'bg-blue-400' },
+    { text: 'Generated cash flow forecast', time: '2d ago', dotColor: 'bg-teal-400' },
+  ],
+  'lp-trust': [
+    { text: 'Prepared LP update for March', time: '3h ago', dotColor: 'bg-green-400' },
+    { text: 'Flagged LP #4 contact overdue', time: '1d ago', dotColor: 'bg-amber-400' },
+    { text: 'Analyzed LP satisfaction trends', time: '3d ago', dotColor: 'bg-blue-400' },
+  ],
+};
+
+function getAgentActivity(agentId: string) {
+  return agentActivityLog[agentId] ?? [
+    { text: 'Agent initialized', time: 'recently', dotColor: 'bg-gray-400' },
+    { text: 'Awaiting first activation', time: '—', dotColor: 'bg-gray-500' },
+  ];
+}
+
 export function AgentsView({ currentUser }: { currentUser?: string }) {
   const ownerName = currentUser ? memberIdToOwnerName[currentUser] ?? currentUser : null;
 
@@ -325,13 +378,21 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
                     </button>
                   </div>
 
-                  {/* Connected Data Sources */}
-                  <div className="flex items-center gap-1.5 text-text-muted">
-                    <Database className="w-3.5 h-3.5" />
-                    <span className="text-xs">
-                      {agent.dataSourcesConnected.length} connected source
-                      {agent.dataSourcesConnected.length !== 1 ? 's' : ''}
-                    </span>
+                  {/* Connected Data Sources + Health */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-text-muted">
+                      <Database className="w-3.5 h-3.5" />
+                      <span className="text-xs">
+                        {agent.dataSourcesConnected.length} connected source
+                        {agent.dataSourcesConnected.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {agent.status === 'active' && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                        <span className="text-[10px] text-green-400/80 font-medium">Online</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -433,6 +494,78 @@ export function AgentsView({ currentUser }: { currentUser?: string }) {
                       placeholder="Add data source..."
                       icon={<Database className="w-4 h-4 text-text-muted" />}
                     />
+                  </div>
+
+                  {/* Agent Health & Metrics */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
+                      Health & Metrics
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      {(() => {
+                        const healthMetrics = getAgentHealthMetrics(selectedAgent);
+                        return healthMetrics.map((metric) => (
+                          <div key={metric.label} className="bg-surface-2 rounded-lg p-3 text-center">
+                            <div className={`text-lg font-bold ${metric.color}`}>{metric.value}</div>
+                            <div className="text-[10px] text-text-muted mt-0.5">{metric.label}</div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Agent Activity Log */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
+                      Recent Activity
+                    </h3>
+                    <div className="space-y-2">
+                      {getAgentActivity(selectedAgent.id).map((activity, i) => (
+                        <div key={i} className="flex items-start gap-2.5 text-xs">
+                          <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${activity.dotColor}`} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-text-primary">{activity.text}</span>
+                            <span className="text-text-muted ml-1.5">{activity.time}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Talk to Agent (Future - Prompt Interface) */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
+                      Talk to Agent
+                    </h3>
+                    <div className="bg-surface-2 rounded-xl border border-border p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`w-2 h-2 rounded-full ${selectedAgent.status === 'active' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+                        <span className="text-xs text-text-muted">
+                          {selectedAgent.status === 'active' ? 'Agent online — ready to assist' : 'Agent offline — coming soon'}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder={selectedAgent.status === 'active' ? `Ask ${selectedAgent.shortName} Agent...` : 'Coming soon with Claude API integration'}
+                          disabled={selectedAgent.status !== 'active'}
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && selectedAgent.status === 'active') {
+                              const input = e.currentTarget;
+                              if (input.value.trim()) {
+                                input.value = '';
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      {selectedAgent.status !== 'active' && (
+                        <p className="text-[10px] text-text-muted/60 mt-2 italic">
+                          Phase 3: Agents become interactive via Claude API
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Download PDF Button */}
