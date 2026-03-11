@@ -337,7 +337,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
   const [aiTimeRange, setAiTimeRange] = useState<7 | 14 | 30>(7);
-  const [showPublishedLibrary, setShowPublishedLibrary] = useState(false);
+  const [showPublishedLibrary, setShowPublishedLibrary] = useState(true);
   const [expandedPublished, setExpandedPublished] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -879,7 +879,108 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
           )}
         </div>
 
-        {activeEntry ? (
+        {/* Published entry summary — shown when today's entry is already published */}
+        {activeEntry?.publishedAt ? (
+          <div className="p-5 space-y-4">
+            <div className="flex flex-col items-center text-center py-6">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/15 border-2 border-emerald-500/30 flex items-center justify-center mb-4">
+                <Check size={24} className="text-emerald-400" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-1">
+                {activeTab === 'morning' ? 'Morning Check-In' : activeTab === 'eod' ? 'End of Day Reflection' : activeTab === 'evening' ? 'Evening Check-In' : 'Weekly Pulse'} Published
+              </h3>
+              <p className="text-sm text-text-muted mb-1">
+                Published at {formatTimestamp(activeEntry.publishedAt)} &mdash; {formatDate(activeEntry.date)}
+              </p>
+              {activeEntry.mood && (
+                <p className="text-sm text-text-secondary">
+                  {moodConfig[activeEntry.mood].emoji} {moodConfig[activeEntry.mood].label}
+                  {activeEntry.energy ? ` · Energy ${activeEntry.energy}/5` : ''}
+                </p>
+              )}
+            </div>
+
+            {/* Quick preview of published content */}
+            <div className="space-y-2.5 px-2">
+              {(activeEntry.winOfTheDay ?? '').trim() && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                  <Trophy size={12} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-amber-400/70 uppercase tracking-wider font-semibold mb-0.5">Win of the Day</p>
+                    <p className="text-xs text-amber-300/90">{activeEntry.winOfTheDay}</p>
+                  </div>
+                </div>
+              )}
+              {activeEntry.reflections.filter(Boolean).length > 0 && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-accent/5 border border-accent/15">
+                  <Brain size={12} className="text-accent flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-accent/70 uppercase tracking-wider font-semibold mb-0.5">Reflections</p>
+                    {activeEntry.reflections.filter(Boolean).map((r, i) => (
+                      <p key={i} className="text-xs text-accent/80">&#8226; {r}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(activeEntry.eveningWentWell ?? '').trim() && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/15">
+                  <Sparkles size={12} className="text-indigo-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-semibold mb-0.5">What Went Well</p>
+                    <p className="text-xs text-indigo-300/90">{activeEntry.eveningWentWell}</p>
+                  </div>
+                </div>
+              )}
+              {(activeEntry.dailyPromptResponse ?? '').trim() && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-teal-500/5 border border-teal-500/15">
+                  <MessageCircle size={12} className="text-teal-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-semibold mb-0.5">Daily Prompt</p>
+                    <p className="text-xs text-teal-300/90">{activeEntry.dailyPromptResponse}</p>
+                  </div>
+                </div>
+              )}
+              {(activeEntry.gratitude ?? '').trim() && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-500/5 border border-rose-500/15">
+                  <Heart size={12} className="text-rose-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-rose-400/70 uppercase tracking-wider font-semibold mb-0.5">Gratitude</p>
+                    <p className="text-xs text-rose-300/90">{activeEntry.gratitude}</p>
+                  </div>
+                </div>
+              )}
+              {(activeEntry.notes ?? '').trim() && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+                  <BookOpen size={12} className="text-text-muted flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-text-muted uppercase tracking-wider font-semibold mb-0.5">Notes</p>
+                    <p className="text-xs text-text-secondary whitespace-pre-wrap">{activeEntry.notes}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 px-2">
+              <button
+                onClick={() => {
+                  document.getElementById('published-library')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="flex-1 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/20 transition-colors"
+              >
+                <Bookmark size={14} />
+                View in Published Library
+              </button>
+              <button
+                onClick={() => unpublishEntry(activeEntry.id)}
+                className="flex-1 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-text-muted text-sm font-semibold hover:bg-white/10 hover:text-text-secondary transition-colors"
+              >
+                <RotateCcw size={14} />
+                Unpublish &amp; Edit
+              </button>
+            </div>
+          </div>
+        ) : activeEntry ? (
           <div className="p-5 space-y-6">
             {/* ============================================================= */}
             {/* EVENING CHECK-IN FORM */}
