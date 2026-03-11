@@ -24,6 +24,10 @@ import {
   Gauge,
   Flame,
   ChevronRight,
+  Lightbulb,
+  Link2,
+  BarChart3,
+  Zap,
 } from 'lucide-react';
 import {
   teamMembers,
@@ -93,6 +97,7 @@ interface MonthlyGoal {
   id: string;
   text: string;
   status: CommitmentStatus;
+  linkedOkrId?: string; // optional link to an OKR objective
 }
 
 interface MonthlyData {
@@ -171,6 +176,52 @@ const getHitRate = (entry: DayEntry | undefined): number => {
   const completed = entry.commitments.filter((c) => c.status === 'completed').length;
   const partial = entry.commitments.filter((c) => c.status === 'partial').length;
   return Math.round(((completed + partial * 0.5) / entry.commitments.length) * 100);
+};
+
+const abbreviateText = (text: string, maxLen: number = 20): string => {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen - 1).trim() + '\u2026';
+};
+
+const getMonthProgress = (): { dayOfMonth: number; totalDays: number; pct: number } => {
+  const now = new Date();
+  const dayOfMonth = now.getDate();
+  const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return { dayOfMonth, totalDays, pct: Math.round((dayOfMonth / totalDays) * 100) };
+};
+
+const getDayHitColor = (hitRate: number, hasData: boolean): string => {
+  if (!hasData) return 'bg-white/5 border-border/30 text-text-muted/40';
+  if (hitRate >= 67) return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+  if (hitRate >= 34) return 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+  return 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+};
+
+const getShortDayName = (dateStr: string): string => {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'long' });
+};
+
+/** Returns monday-start dates for each week of the current month */
+const getMonthWeekStarts = (): string[] => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const weekStarts: string[] = [];
+  // walk from first day, find each monday (or first day if month doesn't start on monday)
+  const current = new Date(firstDay);
+  // back up to monday of the first week
+  const dow = current.getDay();
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  current.setDate(current.getDate() + mondayOffset);
+  while (current <= lastDay) {
+    const weekStart = current.toISOString().split('T')[0];
+    weekStarts.push(weekStart);
+    current.setDate(current.getDate() + 7);
+  }
+  return weekStarts;
 };
 
 const commitStatusIcon = (status: CommitmentStatus) => {
@@ -408,6 +459,78 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
     const partial = monthlyData.goals.filter((g) => g.status === 'partial').length;
     return Math.round(((completed + partial * 0.5) / monthlyData.goals.length) * 100);
   }, [monthlyData.goals]);
+
+  // ── Month progress (day X of Y) ──
+  const monthProgress = useMemo(() => getMonthProgress(), []);
+
+  // ── Weekly intelligence insights ──
+  const weeklyInsights = useMemo(() => {
+    const insights: string[] = [];
+
+    // Find strongest day
+    let bestDay = '';
+    let bestRate = -1;
+    let worstDay = '';
+    let worstRate = 101;
+    for (const date of weekDates) {
+      const entry = memberEntries.find((e) => e.date === date);
+      if (!entry || entry.commitments.length === 0) continue;
+      const rate = getHitRate(entry);
+      if (rate > bestRate) { bestRate = rate; bestDay = date; }
+      if (rate < worstRate) { worstRate = rate; worstDay = date; }
+    }
+    if (bestDay) {
+      insights.push(`Your strongest day this week was ${getShortDayName(bestDay)} at ${bestRate}%`);
+    }
+
+    // Weekly goals progress
+    if (weeklyData.goals.length > 0) {
+      const completed = weeklyData.goals.filter((g) => g.status === 'completed').length;
+      insights.push(`You\u2019ve completed ${completed} of ${weeklyData.goals.length} weekly goals so far`);
+    }
+
+    // Tip about weak day
+    if (worstDay && worstRate < 50 && worstDay !== bestDay) {
+      insights.push(`Tip: You dipped on ${getShortDayName(worstDay)} \u2014 try front-loading critical work`);
+    } else if (memberEntries.length === 0) {
+      insights.push('Tip: Start logging your Top 3 daily to build momentum');
+    }
+
+    return insights;
+  }, [weekDates, memberEntries, weeklyData.goals]);
+
+  // ── Month-to-date weekly hit rates ──
+  const monthWeeklyRates = useMemo(() => {
+    const weekStarts = getMonthWeekStarts();
+    const today = todayStr();
+    return weekStarts.map((ws, idx) => {
+      const weekEnd = new Date(ws);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const endStr = weekEnd.toISOString().split('T')[0];
+      // find entries in this week
+      const entries = memberEntries.filter((e) => e.date >= ws && e.date <= endStr);
+      if (entries.length === 0) return { label: `Week ${idx + 1}`, rate: null, isCurrent: ws <= today && endStr >= today };
+      const totalRate = entries.reduce((sum, e) => sum + getHitRate(e), 0);
+      return { label: ws <= today && endStr >= today ? 'This week' : `Week ${idx + 1}`, rate: Math.round(totalRate / entries.length), isCurrent: ws <= today && endStr >= today };
+    });
+  }, [memberEntries]);
+
+  const monthAvgDailyRate = useMemo(() => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthEntries = memberEntries.filter((e) => e.date.startsWith(ym) && e.commitments.length > 0);
+    if (monthEntries.length === 0) return null;
+    const total = monthEntries.reduce((sum, e) => sum + getHitRate(e), 0);
+    return Math.round(total / monthEntries.length);
+  }, [memberEntries]);
+
+  // ── Monthly goal OKR link toggle ──
+  const toggleMonthlyGoalOkr = (goalId: string, okrId: string | undefined) => {
+    const goals = monthlyData.goals.map((g) =>
+      g.id === goalId ? { ...g, linkedOkrId: okrId } : g
+    );
+    saveMonthlyData({ goals });
+  };
 
   // ── Commitment handlers ──
   const addCommitment = () => {
@@ -651,6 +774,20 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
                   </button>
                 </div>
               )}
+
+              {/* Cross-reference to weekly goals */}
+              <div className="flex items-center gap-2 pt-2 border-t border-border/30 mt-2">
+                <Link2 className="w-3 h-3 text-text-muted/60 flex-shrink-0" />
+                <p className="text-[11px] text-text-muted/70 leading-snug">
+                  These daily priorities should ladder up to your weekly goals.{' '}
+                  <button
+                    onClick={() => setFocusTab('week')}
+                    className="text-accent hover:text-accent-2 transition-colors inline-flex items-center gap-0.5"
+                  >
+                    View Weekly <ArrowRight className="w-2.5 h-2.5" />
+                  </button>
+                </p>
+              </div>
             </div>
           )}
 
@@ -659,25 +796,38 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
             <div className="space-y-6">
               {/* Weekly Goals */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-accent" />
-                    Weekly Goals
-                    <span className="text-xs font-normal text-text-muted">({getWeekLabel()})</span>
-                  </h3>
-                  {weeklyData.goals.length > 0 && (
-                    <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
-                      weeklyCompletionRate >= 75 ? 'bg-emerald-500/15 text-emerald-400' :
-                      weeklyCompletionRate >= 25 ? 'bg-amber-500/15 text-amber-400' :
-                      'bg-white/10 text-text-muted'
-                    }`}>
-                      {weeklyCompletionRate}% complete
-                    </span>
-                  )}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-accent" />
+                      Weekly Goals
+                      <span className="text-xs font-normal text-text-muted">({getWeekLabel()})</span>
+                    </h3>
+                    {weeklyData.goals.length > 0 && (
+                      <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                        weeklyCompletionRate >= 75 ? 'bg-emerald-500/15 text-emerald-400' :
+                        weeklyCompletionRate >= 25 ? 'bg-amber-500/15 text-amber-400' :
+                        'bg-white/10 text-text-muted'
+                      }`}>
+                        {weeklyCompletionRate}% complete
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-[11px] text-text-muted/70">These weekly goals should drive your monthly milestones forward.</p>
+                    <button
+                      onClick={() => setFocusTab('month')}
+                      className="text-[11px] text-accent hover:text-accent-2 transition-colors flex items-center gap-0.5 flex-shrink-0"
+                    >
+                      View Monthly Goals <ArrowRight className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {weeklyData.goals.length === 0 && (
-                  <p className="text-sm text-text-muted italic">No weekly goals set yet. Add your goals for the week below.</p>
+                  <div className="bg-surface-2/40 border border-border/40 rounded-lg p-4">
+                    <p className="text-sm text-text-muted">Set 3-5 weekly goals that support your monthly milestones. Each daily Top 3 should ladder into these.</p>
+                  </div>
                 )}
 
                 <div className="space-y-2">
@@ -762,111 +912,203 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
                 </div>
               )}
 
-              {/* Daily Breakdown */}
+              {/* Your Daily Top 3 Tracker */}
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Daily Breakdown</p>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                    <BarChart3 className="w-3 h-3" />
+                    Your Daily Top 3 Tracker
+                  </p>
+                  <p className="text-[10px] text-text-muted/60 mt-0.5">How well you hit your Top 3 each day this week</p>
+                </div>
                 <div className="grid grid-cols-7 gap-2">
                   {weekDates.map((date) => {
                     const entry = memberEntries.find((e) => e.date === date);
                     const hitRate = getHitRate(entry);
                     const isToday = date === todayDate;
-                    const count = entry?.commitments.length ?? 0;
+                    const hasData = !!entry && entry.commitments.length > 0;
+                    const colorClass = getDayHitColor(hitRate, hasData);
                     return (
                       <div
                         key={date}
-                        className={`text-center p-3 rounded-lg border transition-colors ${
-                          isToday ? 'border-accent/50 bg-accent/5' : 'border-border/50 bg-surface-2/30'
+                        className={`text-center p-3 rounded-lg border transition-colors ${colorClass} ${
+                          isToday ? 'ring-1 ring-accent/60 ring-offset-1 ring-offset-surface' : ''
                         }`}
                       >
-                        <p className={`text-[10px] uppercase font-semibold tracking-wider mb-2 ${isToday ? 'text-accent' : 'text-text-muted'}`}>
+                        <p className={`text-[10px] uppercase font-semibold tracking-wider mb-1.5 ${isToday ? 'text-accent' : ''}`}>
                           {dayLabel(date).split(',')[0]}
                         </p>
-                        {count > 0 ? (
+                        {hasData ? (
                           <>
-                            <p className={`text-lg font-bold ${
-                              hitRate >= 75 ? 'text-emerald-400' : hitRate >= 25 ? 'text-amber-400' : 'text-text-muted'
-                            }`}>
-                              {hitRate}%
-                            </p>
-                            <p className="text-[10px] text-text-muted mt-0.5">{count} item{count !== 1 ? 's' : ''}</p>
+                            <p className="text-lg font-bold">{hitRate}%</p>
+                            <div className="mt-1 space-y-0.5">
+                              {entry.commitments.slice(0, 3).map((c, ci) => (
+                                <p
+                                  key={ci}
+                                  className={`text-[8px] leading-tight truncate ${
+                                    c.status === 'completed' ? 'line-through opacity-60' : 'opacity-80'
+                                  }`}
+                                  title={c.text}
+                                >
+                                  {abbreviateText(c.text, 20)}
+                                </p>
+                              ))}
+                            </div>
                           </>
                         ) : (
-                          <p className="text-lg font-bold text-text-muted/30">—</p>
+                          <p className="text-lg font-bold text-text-muted/30">&mdash;</p>
                         )}
                       </div>
                     );
                   })}
                 </div>
               </div>
+
+              {/* Weekly Intelligence Summary */}
+              {(weeklyInsights.length > 0 || weeklyData.goals.length > 0) && (
+                <div className="bg-gradient-to-r from-accent/5 via-teal-500/5 to-blue-500/5 border border-accent/20 rounded-lg p-4 space-y-2">
+                  <p className="text-xs font-semibold text-accent flex items-center gap-1.5 uppercase tracking-wider">
+                    <Zap className="w-3 h-3" />
+                    Weekly Intelligence
+                  </p>
+                  <div className="space-y-1.5">
+                    {weeklyInsights.map((insight, i) => (
+                      <p key={i} className="text-xs text-text-secondary flex items-start gap-2">
+                        <span className="text-accent/60 flex-shrink-0 mt-0.5">{insight.startsWith('Tip') ? '\u{1F4A1}' : '\u2022'}</span>
+                        <span>{insight}</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* ── MONTH TAB ── */}
           {focusTab === 'month' && (
             <div className="space-y-6">
+              {/* Monthly Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-text-secondary">
+                    Day {monthProgress.dayOfMonth} of {monthProgress.totalDays} &mdash; {monthlyCompletionRate}% of goals complete
+                  </p>
+                  <span className="text-[10px] text-text-muted font-mono">{getMonthLabel()}</span>
+                </div>
+                <div className="relative h-2.5 bg-surface-3 rounded-full overflow-hidden">
+                  {/* Time elapsed bar (subtle) */}
+                  <div
+                    className="absolute inset-y-0 left-0 bg-white/10 rounded-full"
+                    style={{ width: `${monthProgress.pct}%` }}
+                  />
+                  {/* Goals completion overlay (accent) */}
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-700"
+                    style={{
+                      width: `${monthlyCompletionRate}%`,
+                      background: monthlyCompletionRate >= 75 ? '#22c55e' : monthlyCompletionRate >= 25 ? '#eab308' : '#ef4444',
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-text-muted">
+                  <span>Time elapsed: {monthProgress.pct}%</span>
+                  <span>Goals done: {monthlyCompletionRate}%</span>
+                </div>
+              </div>
+
               {/* Monthly Goals */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
-                    <CalendarRange className="w-4 h-4 text-accent" />
-                    Monthly Goals
-                    <span className="text-xs font-normal text-text-muted">({getMonthLabel()})</span>
-                  </h3>
-                  {monthlyData.goals.length > 0 && (
-                    <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
-                      monthlyCompletionRate >= 75 ? 'bg-emerald-500/15 text-emerald-400' :
-                      monthlyCompletionRate >= 25 ? 'bg-amber-500/15 text-amber-400' :
-                      'bg-white/10 text-text-muted'
-                    }`}>
-                      {monthlyCompletionRate}% complete
-                    </span>
-                  )}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                      <CalendarRange className="w-4 h-4 text-accent" />
+                      Monthly Milestones
+                      <span className="text-xs font-normal text-text-muted">({getMonthLabel()})</span>
+                    </h3>
+                    {monthlyData.goals.length > 0 && (
+                      <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                        monthlyCompletionRate >= 75 ? 'bg-emerald-500/15 text-emerald-400' :
+                        monthlyCompletionRate >= 25 ? 'bg-amber-500/15 text-amber-400' :
+                        'bg-white/10 text-text-muted'
+                      }`}>
+                        {monthlyCompletionRate}% complete
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-text-muted/70 mt-1">Monthly milestones that drive your quarterly OKRs. Weekly goals should support these.</p>
                 </div>
 
                 {monthlyData.goals.length === 0 && (
-                  <p className="text-sm text-text-muted italic">No monthly goals set yet. Add your milestones for the month below.</p>
+                  <div className="bg-surface-2/40 border border-border/40 rounded-lg p-4">
+                    <p className="text-sm text-text-muted">Set 2-4 monthly milestones that drive your OKR key results. Weekly goals should support these.</p>
+                  </div>
                 )}
 
                 <div className="space-y-2">
-                  {monthlyData.goals.map((g, i) => (
-                    <div
-                      key={g.id}
-                      className="group flex items-center gap-3 bg-surface-2/50 border border-border/50 rounded-lg px-4 py-3 hover:border-border transition-colors"
-                    >
-                      <span className="text-xs font-mono text-text-muted/50 w-4">{i + 1}</span>
-                      <button onClick={() => cycleMonthlyGoalStatus(g.id)} className="flex-shrink-0 hover:scale-110 transition-transform">
-                        {commitStatusIcon(g.status)}
-                      </button>
-                      {editingMonthlyGoalId === g.id ? (
-                        <input
-                          autoFocus
-                          defaultValue={g.text}
-                          className="flex-1 bg-white/5 border border-accent/30 rounded-md px-2 py-1 text-sm text-text-primary outline-none focus:border-accent/60 transition-colors"
-                          onBlur={(e) => updateMonthlyGoalText(g.id, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') updateMonthlyGoalText(g.id, e.currentTarget.value);
-                            if (e.key === 'Escape') setEditingMonthlyGoalId(null);
-                          }}
-                        />
-                      ) : (
-                        <span
-                          onClick={() => setEditingMonthlyGoalId(g.id)}
-                          className={`flex-1 text-sm cursor-text hover:bg-white/5 rounded-md px-2 py-1 -mx-2 transition-colors ${
-                            g.status === 'completed' ? 'text-text-muted line-through' : 'text-text-primary'
-                          }`}
-                          title="Click to edit"
-                        >
-                          {g.text}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => removeMonthlyGoal(g.id)}
-                        className="p-1 text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-rose-400 transition-all"
+                  {monthlyData.goals.map((g, i) => {
+                    const linkedOkr = g.linkedOkrId ? myOkrs.find((o) => o.id === g.linkedOkrId) : undefined;
+                    return (
+                      <div
+                        key={g.id}
+                        className="group bg-surface-2/50 border border-border/50 rounded-lg px-4 py-3 hover:border-border transition-colors"
                       >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-mono text-text-muted/50 w-4">{i + 1}</span>
+                          <button onClick={() => cycleMonthlyGoalStatus(g.id)} className="flex-shrink-0 hover:scale-110 transition-transform">
+                            {commitStatusIcon(g.status)}
+                          </button>
+                          {editingMonthlyGoalId === g.id ? (
+                            <input
+                              autoFocus
+                              defaultValue={g.text}
+                              className="flex-1 bg-white/5 border border-accent/30 rounded-md px-2 py-1 text-sm text-text-primary outline-none focus:border-accent/60 transition-colors"
+                              onBlur={(e) => updateMonthlyGoalText(g.id, e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') updateMonthlyGoalText(g.id, e.currentTarget.value);
+                                if (e.key === 'Escape') setEditingMonthlyGoalId(null);
+                              }}
+                            />
+                          ) : (
+                            <span
+                              onClick={() => setEditingMonthlyGoalId(g.id)}
+                              className={`flex-1 text-sm cursor-text hover:bg-white/5 rounded-md px-2 py-1 -mx-2 transition-colors ${
+                                g.status === 'completed' ? 'text-text-muted line-through' : 'text-text-primary'
+                              }`}
+                              title="Click to edit"
+                            >
+                              {g.text}
+                            </span>
+                          )}
+                          {/* OKR link selector */}
+                          {myOkrs.length > 0 && (
+                            <select
+                              value={g.linkedOkrId ?? ''}
+                              onChange={(e) => toggleMonthlyGoalOkr(g.id, e.target.value || undefined)}
+                              className="text-[10px] bg-white/5 border border-border/40 rounded px-1.5 py-0.5 text-text-muted outline-none focus:border-accent/40 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity max-w-[120px]"
+                              title="Link to OKR"
+                            >
+                              <option value="">Link OKR...</option>
+                              {myOkrs.map((okr) => (
+                                <option key={okr.id} value={okr.id}>{abbreviateText(okr.objective, 30)}</option>
+                              ))}
+                            </select>
+                          )}
+                          <button
+                            onClick={() => removeMonthlyGoal(g.id)}
+                            className="p-1 text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-rose-400 transition-all"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {linkedOkr && (
+                          <div className="flex items-center gap-1.5 ml-7 mt-1.5">
+                            <Target className="w-2.5 h-2.5 text-accent/60" />
+                            <span className="text-[10px] text-accent/70">{abbreviateText(linkedOkr.objective, 50)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -874,7 +1116,7 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
                     value={newMonthlyGoal}
                     onChange={(e) => setNewMonthlyGoal(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') addMonthlyGoal(); }}
-                    placeholder={`Monthly goal ${monthlyData.goals.length + 1}...`}
+                    placeholder={`Monthly milestone ${monthlyData.goals.length + 1}...`}
                     className="flex-1 bg-white/5 border border-border rounded-lg px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 outline-none focus:border-teal-500/50 transition-colors"
                   />
                   <button
@@ -884,6 +1126,44 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
                   >
                     <Plus className="w-4 h-4" />
                   </button>
+                </div>
+              </div>
+
+              {/* Month-to-Date Summary */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                  <TrendingUp className="w-3 h-3" />
+                  Month-to-Date Summary
+                </p>
+                <div className="bg-surface-2/30 border border-border/50 rounded-lg p-4 space-y-3">
+                  {/* Weekly rates row */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {monthWeeklyRates.map((w, i) => (
+                      <div key={i} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs ${
+                        w.isCurrent ? 'bg-accent/10 border border-accent/20' : 'bg-white/5 border border-border/30'
+                      }`}>
+                        <span className={`font-medium ${w.isCurrent ? 'text-accent' : 'text-text-secondary'}`}>{w.label}:</span>
+                        <span className={`font-mono ${
+                          w.rate === null ? 'text-text-muted/40' :
+                          w.rate >= 67 ? 'text-emerald-400' :
+                          w.rate >= 34 ? 'text-amber-400' : 'text-rose-400'
+                        }`}>
+                          {w.rate !== null ? `${w.rate}%` : '\u2014'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Average daily hit rate */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/30">
+                    <span className="text-[11px] text-text-muted">Avg daily hit rate this month:</span>
+                    <span className={`text-xs font-bold font-mono ${
+                      monthAvgDailyRate === null ? 'text-text-muted/40' :
+                      monthAvgDailyRate >= 67 ? 'text-emerald-400' :
+                      monthAvgDailyRate >= 34 ? 'text-amber-400' : 'text-rose-400'
+                    }`}>
+                      {monthAvgDailyRate !== null ? `${monthAvgDailyRate}%` : 'No data yet'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
