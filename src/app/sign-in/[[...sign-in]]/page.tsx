@@ -14,7 +14,7 @@ export default function SignInPage() {
         background: '#0a0e17',
         position: 'relative',
         overflow: 'hidden',
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
+        fontFamily: "var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
       }}
     >
       {/* Background effects */}
@@ -109,6 +109,73 @@ export default function SignInPage() {
               rootBox: {
                 width: '100%',
                 maxWidth: 440,
+              },
+              card: {
+                backgroundColor: '#0f1423',
+                border: '1px solid rgba(30, 41, 59, 0.8)',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 40px rgba(20, 184, 166, 0.05)',
+              },
+              socialButtonsBlockButton: {
+                backgroundColor: '#111827',
+                border: '1px solid #1e293b',
+                color: '#e2e8f0',
+              },
+              socialButtonsBlockButtonText: {
+                color: '#e2e8f0',
+              },
+              dividerLine: {
+                backgroundColor: '#1e293b',
+              },
+              dividerText: {
+                color: '#64748b',
+              },
+              formFieldLabel: {
+                color: '#94a3b8',
+              },
+              formFieldInput: {
+                backgroundColor: '#111827',
+                border: '1px solid #1e293b',
+                color: '#e2e8f0',
+              },
+              formButtonPrimary: {
+                background: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+                border: 'none',
+                boxShadow: '0 4px 12px rgba(20, 184, 166, 0.3)',
+                color: '#ffffff',
+                fontWeight: '600',
+              },
+              footerActionLink: {
+                color: '#14b8a6',
+              },
+              footerActionText: {
+                color: '#64748b',
+              },
+              headerTitle: {
+                color: '#f1f5f9',
+              },
+              headerSubtitle: {
+                color: '#94a3b8',
+              },
+              identityPreview: {
+                backgroundColor: '#111827',
+                border: '1px solid #1e293b',
+              },
+              identityPreviewText: {
+                color: '#e2e8f0',
+              },
+              identityPreviewEditButton: {
+                color: '#14b8a6',
+              },
+              otpCodeFieldInput: {
+                backgroundColor: '#111827',
+                border: '1px solid #1e293b',
+                color: '#e2e8f0',
+              },
+              formResendCodeLink: {
+                color: '#14b8a6',
+              },
+              alertText: {
+                color: '#e2e8f0',
               },
             },
           }}
