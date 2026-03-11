@@ -14,7 +14,7 @@ import { useEditableStore } from '@/lib/useEditableStore';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type EntryType = 'morning' | 'eod' | 'weekly';
+type EntryType = 'morning' | 'eod' | 'evening' | 'weekly';
 type Mood = 'great' | 'good' | 'neutral' | 'tough' | 'rough';
 
 interface ChecklistItem {
@@ -39,6 +39,13 @@ interface JournalEntry {
   winOfTheDay: string;
   publishedAt?: string; // ISO timestamp when published
   dailyPromptResponse: string;
+  // Evening check-in fields
+  eveningWentWell?: string;
+  eveningCouldImprove?: string;
+  eveningGratitude?: string;
+  eveningTomorrowPriority?: string;
+  eveningTomorrowEnergy?: number; // 1-5
+  eveningSleepIntention?: string;
 }
 
 interface JournalData {
@@ -138,6 +145,10 @@ function analyzeThemes(entries: JournalEntry[]): ThemeCount[] {
       entry.notes,
       entry.winOfTheDay ?? '',
       entry.dailyPromptResponse ?? '',
+      entry.eveningWentWell ?? '',
+      entry.eveningCouldImprove ?? '',
+      entry.eveningGratitude ?? '',
+      entry.eveningTomorrowPriority ?? '',
     ]
       .join(' ')
       .toLowerCase();
@@ -334,6 +345,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
   // Build checklist from TeamOS
   const defaultChecklist = useMemo((): ChecklistItem[] => {
     if (!memberOS) return [];
+    if (activeTab === 'evening') return [];
     const items =
       activeTab === 'morning'
         ? memberOS.operatingSystem.morningChecklist
@@ -353,6 +365,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
         'What will I do differently tomorrow?',
       ];
     }
+    if (activeTab === 'evening') return [];
     // weekly
     return [
       ...memberOS.qualities.map((q) => q.weeklyQuestion).slice(0, 3),
@@ -370,6 +383,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
     });
     const mornings = thisWeek.filter((e) => e.type === 'morning').length;
     const eods = thisWeek.filter((e) => e.type === 'eod').length;
+    const evenings = thisWeek.filter((e) => e.type === 'evening').length;
     const weeklys = thisWeek.filter((e) => e.type === 'weekly').length;
     const avgMood = thisWeek.filter((e) => e.mood).length > 0
       ? thisWeek.reduce((sum, e) => {
@@ -377,7 +391,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
           return sum + (moodOrder[e.mood ?? 'neutral'] ?? 3);
         }, 0) / thisWeek.filter((e) => e.mood).length
       : 0;
-    return { mornings, eods, weeklys, total: thisWeek.length, avgMood };
+    return { mornings, eods, evenings, weeklys, total: thisWeek.length, avgMood };
   }, [journal.entries]);
 
   // AI Analysis: theme analysis across recent entries
@@ -410,6 +424,12 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
       winOfTheDay: '',
       publishedAt: undefined,
       dailyPromptResponse: '',
+      eveningWentWell: '',
+      eveningCouldImprove: '',
+      eveningGratitude: '',
+      eveningTomorrowPriority: '',
+      eveningTomorrowEnergy: undefined,
+      eveningSleepIntention: '',
     };
   }
 
@@ -480,6 +500,10 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
     updateEntry(entryId, (e) => ({ ...e, dailyPromptResponse: value }));
   }
 
+  function setEveningField(entryId: string, field: keyof JournalEntry, value: string | number) {
+    updateEntry(entryId, (e) => ({ ...e, [field]: value }));
+  }
+
   function publishEntry(entryId: string) {
     updateEntry(entryId, (e) => ({
       ...e,
@@ -517,6 +541,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
   const tabConfig: { type: EntryType; icon: typeof Sun; label: string; sublabel: string }[] = [
     { type: 'morning', icon: Sun, label: 'Morning', sublabel: 'Set intentions' },
     { type: 'eod', icon: Moon, label: 'End of Day', sublabel: 'Reflect & close' },
+    { type: 'evening', icon: Moon, label: 'Evening', sublabel: 'Wind down & plan' },
     { type: 'weekly', icon: CalendarDays, label: 'Weekly Pulse', sublabel: 'Step back & assess' },
   ];
 
@@ -557,7 +582,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
       )}
 
       {/* Week stats bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="rounded-xl bg-white/5 border border-white/10 p-3">
           <div className="flex items-center gap-2 mb-1">
             <Sun size={13} className="text-amber-400" />
@@ -571,6 +596,13 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
             <span className="text-xs text-text-muted">EODs</span>
           </div>
           <p className="text-lg font-bold text-foreground">{stats.eods}<span className="text-xs text-text-muted font-normal">/7</span></p>
+        </div>
+        <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Moon size={13} className="text-purple-400" />
+            <span className="text-xs text-text-muted">Evenings</span>
+          </div>
+          <p className="text-lg font-bold text-foreground">{stats.evenings}<span className="text-xs text-text-muted font-normal">/7</span></p>
         </div>
         <div className="rounded-xl bg-white/5 border border-white/10 p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -626,7 +658,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
           <div className="flex items-center gap-2">
             <BookOpen size={15} className="text-accent" />
             <span className="text-sm font-semibold text-foreground">
-              {activeTab === 'morning' ? 'Morning Check-In' : activeTab === 'eod' ? 'End of Day Reflection' : 'Weekly Pulse'}
+              {activeTab === 'morning' ? 'Morning Check-In' : activeTab === 'eod' ? 'End of Day Reflection' : activeTab === 'evening' ? 'Evening Check-In' : 'Weekly Pulse'}
             </span>
             <span className="text-xs text-text-muted">&mdash; {formatDate(today)}</span>
             {/* Published badge */}
@@ -649,6 +681,146 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
 
         {activeEntry ? (
           <div className="p-5 space-y-6">
+            {/* ============================================================= */}
+            {/* EVENING CHECK-IN FORM */}
+            {/* ============================================================= */}
+            {activeTab === 'evening' ? (
+              <>
+                {/* What went well today? */}
+                <div className="relative overflow-hidden rounded-xl bg-indigo-500/5 border border-indigo-500/25 p-4">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/8 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles size={14} className="text-indigo-400" />
+                      <p className="text-[10px] text-indigo-400/80 font-bold uppercase tracking-widest">What went well today?</p>
+                    </div>
+                    <textarea
+                      value={activeEntry.eveningWentWell ?? ''}
+                      onChange={(e) => setEveningField(activeEntry.id, 'eveningWentWell', e.target.value)}
+                      placeholder="Celebrate your wins, big and small..."
+                      rows={3}
+                      className="w-full bg-indigo-500/5 border border-indigo-500/20 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-indigo-400/30 focus:border-indigo-400/40 focus:ring-1 focus:ring-indigo-400/20 outline-none resize-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* What could have gone better? */}
+                <div className="relative overflow-hidden rounded-xl bg-purple-500/5 border border-purple-500/25 p-4">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/8 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RotateCcw size={14} className="text-purple-400" />
+                      <p className="text-[10px] text-purple-400/80 font-bold uppercase tracking-widest">What could have gone better?</p>
+                    </div>
+                    <textarea
+                      value={activeEntry.eveningCouldImprove ?? ''}
+                      onChange={(e) => setEveningField(activeEntry.id, 'eveningCouldImprove', e.target.value)}
+                      placeholder="Honest reflection without judgment..."
+                      rows={3}
+                      className="w-full bg-purple-500/5 border border-purple-500/20 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-purple-400/30 focus:border-purple-400/40 focus:ring-1 focus:ring-purple-400/20 outline-none resize-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Gratitude - 3 things */}
+                <div className="relative overflow-hidden rounded-xl bg-indigo-500/5 border border-indigo-500/25 p-4">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/8 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Heart size={14} className="text-indigo-400" />
+                      <p className="text-[10px] text-indigo-400/80 font-bold uppercase tracking-widest">Gratitude &mdash; 3 things I&apos;m grateful for</p>
+                    </div>
+                    <textarea
+                      value={activeEntry.eveningGratitude ?? ''}
+                      onChange={(e) => setEveningField(activeEntry.id, 'eveningGratitude', e.target.value)}
+                      placeholder="1. &#10;2. &#10;3. "
+                      rows={3}
+                      className="w-full bg-indigo-500/5 border border-indigo-500/20 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-indigo-400/30 focus:border-indigo-400/40 focus:ring-1 focus:ring-indigo-400/20 outline-none resize-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Tomorrow's #1 priority */}
+                <div className="relative overflow-hidden rounded-xl bg-purple-500/5 border border-purple-500/25 p-4">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/8 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target size={14} className="text-purple-400" />
+                      <p className="text-[10px] text-purple-400/80 font-bold uppercase tracking-widest">Tomorrow&apos;s #1 Priority</p>
+                    </div>
+                    <textarea
+                      value={activeEntry.eveningTomorrowPriority ?? ''}
+                      onChange={(e) => setEveningField(activeEntry.id, 'eveningTomorrowPriority', e.target.value)}
+                      placeholder="The single most important thing to accomplish tomorrow..."
+                      rows={2}
+                      className="w-full bg-purple-500/5 border border-purple-500/20 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-purple-400/30 focus:border-purple-400/40 focus:ring-1 focus:ring-purple-400/20 outline-none resize-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Energy level for tomorrow & Sleep intention */}
+                <div className="flex flex-wrap gap-4">
+                  {/* Energy level for tomorrow */}
+                  <div>
+                    <p className="text-xs text-text-muted mb-2 font-semibold uppercase tracking-wider">Energy for Tomorrow</p>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((level) => {
+                        const isSelected = (activeEntry.eveningTomorrowEnergy ?? 0) >= level;
+                        return (
+                          <button
+                            key={level}
+                            onClick={() => setEveningField(activeEntry.id, 'eveningTomorrowEnergy', level)}
+                            className={`w-8 h-8 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${
+                              isSelected
+                                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400'
+                                : 'bg-white/3 border-white/10 text-text-muted hover:bg-white/8'
+                            }`}
+                            title={energyLabels[level]}
+                          >
+                            {level}
+                          </button>
+                        );
+                      })}
+                      {activeEntry.eveningTomorrowEnergy && (
+                        <span className="text-[10px] text-text-muted self-center ml-1">{energyLabels[activeEntry.eveningTomorrowEnergy]}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sleep intention */}
+                  <div className="flex-1 min-w-[180px]">
+                    <p className="text-xs text-text-muted mb-2 font-semibold uppercase tracking-wider">Sleep Intention</p>
+                    <input
+                      type="text"
+                      value={activeEntry.eveningSleepIntention ?? ''}
+                      onChange={(e) => setEveningField(activeEntry.id, 'eveningSleepIntention', e.target.value)}
+                      placeholder="e.g. 10:30 PM"
+                      className="w-full bg-indigo-500/5 border border-indigo-500/20 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-indigo-400/30 focus:border-indigo-400/40 focus:ring-1 focus:ring-indigo-400/20 outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Publish button for evening */}
+                <div className="pt-2">
+                  {activeEntry.publishedAt ? (
+                    <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+                      <Lock size={14} />
+                      <span className="text-sm font-semibold">Published &#10003;</span>
+                      <span className="text-xs text-emerald-400/60">&mdash; {formatTimestamp(activeEntry.publishedAt)}</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => publishEntry(activeEntry.id)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500/80 via-purple-500/80 to-indigo-600/80 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-600 text-white font-semibold text-sm border border-indigo-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20"
+                    >
+                      <Send size={14} />
+                      Publish Entry
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+            <>
             {/* ============================================================= */}
             {/* FEATURE 5: QUESTION OF THE DAY — Daily Firm Prompt */}
             {/* ============================================================= */}
@@ -897,19 +1069,21 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                 </button>
               )}
             </div>
+            </>
+            )}
           </div>
         ) : (
           /* Empty state */
           <div className="p-8 text-center">
             <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
-              {activeTab === 'morning' ? <Sun size={24} className="text-accent" /> : activeTab === 'eod' ? <Moon size={24} className="text-accent" /> : <CalendarDays size={24} className="text-accent" />}
+              {activeTab === 'morning' ? <Sun size={24} className="text-accent" /> : activeTab === 'eod' ? <Moon size={24} className="text-accent" /> : activeTab === 'evening' ? <Moon size={24} className="text-indigo-400" /> : <CalendarDays size={24} className="text-accent" />}
             </div>
             <p className="text-sm text-foreground font-medium mb-1">
-              {activeTab === 'morning' ? 'Start your morning check-in' : activeTab === 'eod' ? 'Reflect on your day' : 'Take your weekly pulse'}
+              {activeTab === 'morning' ? 'Start your morning check-in' : activeTab === 'eod' ? 'Reflect on your day' : activeTab === 'evening' ? 'Wind down & plan tomorrow' : 'Take your weekly pulse'}
             </p>
             <p className="text-xs text-text-muted mb-4">
               {memberOS
-                ? `Your ${activeTab === 'morning' ? 'morning checklist' : activeTab === 'eod' ? 'evening reflection' : 'weekly pulse'} from your Team OS will guide you.`
+                ? `Your ${activeTab === 'morning' ? 'morning checklist' : activeTab === 'eod' ? 'evening reflection' : activeTab === 'evening' ? 'evening check-in' : 'weekly pulse'} from your Team OS will guide you.`
                 : 'Set your intentions and track your operating rhythm.'}
             </p>
             <button
@@ -1105,7 +1279,7 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-foreground">
-                            {entry.type === 'morning' ? 'Morning' : entry.type === 'eod' ? 'EOD' : 'Weekly'}
+                            {entry.type === 'morning' ? 'Morning' : entry.type === 'eod' ? 'EOD' : entry.type === 'evening' ? 'Evening' : 'Weekly'}
                           </span>
                           <span className="text-xs text-text-muted">{formatDate(entry.date)}</span>
                           {entry.publishedAt && (
@@ -1145,6 +1319,64 @@ export function JournalView({ currentUser }: { currentUser?: string }) {
                             <div>
                               <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-semibold mb-0.5">Daily Prompt Response</p>
                               <p className="text-xs text-teal-300/90">{entry.dailyPromptResponse}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Evening check-in fields in history */}
+                        {entry.type === 'evening' && (
+                          <div className="space-y-2">
+                            {(entry.eveningWentWell ?? '').trim() && (
+                              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/15">
+                                <Sparkles size={12} className="text-indigo-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-semibold mb-0.5">What Went Well</p>
+                                  <p className="text-xs text-indigo-300/90 whitespace-pre-wrap">{entry.eveningWentWell}</p>
+                                </div>
+                              </div>
+                            )}
+                            {(entry.eveningCouldImprove ?? '').trim() && (
+                              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-purple-500/5 border border-purple-500/15">
+                                <RotateCcw size={12} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-[10px] text-purple-400/70 uppercase tracking-wider font-semibold mb-0.5">Could Have Gone Better</p>
+                                  <p className="text-xs text-purple-300/90 whitespace-pre-wrap">{entry.eveningCouldImprove}</p>
+                                </div>
+                              </div>
+                            )}
+                            {(entry.eveningGratitude ?? '').trim() && (
+                              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/15">
+                                <Heart size={12} className="text-indigo-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-semibold mb-0.5">Gratitude</p>
+                                  <p className="text-xs text-indigo-300/90 whitespace-pre-wrap">{entry.eveningGratitude}</p>
+                                </div>
+                              </div>
+                            )}
+                            {(entry.eveningTomorrowPriority ?? '').trim() && (
+                              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-purple-500/5 border border-purple-500/15">
+                                <Target size={12} className="text-purple-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-[10px] text-purple-400/70 uppercase tracking-wider font-semibold mb-0.5">Tomorrow&apos;s #1 Priority</p>
+                                  <p className="text-xs text-purple-300/90">{entry.eveningTomorrowPriority}</p>
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-4 px-3 py-2">
+                              {entry.eveningTomorrowEnergy && (
+                                <div className="flex items-center gap-1.5">
+                                  <Zap size={12} className="text-indigo-400" />
+                                  <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">Energy:</span>
+                                  <span className="text-xs text-indigo-300 font-medium">{entry.eveningTomorrowEnergy}/5 {energyLabels[entry.eveningTomorrowEnergy]}</span>
+                                </div>
+                              )}
+                              {(entry.eveningSleepIntention ?? '').trim() && (
+                                <div className="flex items-center gap-1.5">
+                                  <Moon size={12} className="text-indigo-400" />
+                                  <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">Sleep:</span>
+                                  <span className="text-xs text-indigo-300 font-medium">{entry.eveningSleepIntention}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}

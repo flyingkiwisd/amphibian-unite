@@ -79,6 +79,26 @@ interface DashboardPersonalData {
   ownership: OwnershipArea[];
 }
 
+interface WeeklyGoal {
+  id: string;
+  text: string;
+  status: CommitmentStatus;
+}
+
+interface WeeklyData {
+  goals: WeeklyGoal[];
+}
+
+interface MonthlyGoal {
+  id: string;
+  text: string;
+  status: CommitmentStatus;
+}
+
+interface MonthlyData {
+  goals: MonthlyGoal[];
+}
+
 type FocusTab = 'today' | 'week' | 'month';
 
 // ── Helpers ────────────────────────────────────────────────
@@ -110,6 +130,35 @@ const getWeekDates = (): string[] => {
     dates.push(d.toISOString().split('T')[0]);
   }
   return dates;
+};
+
+const getWeekStart = (): string => {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + mondayOffset);
+  return monday.toISOString().split('T')[0];
+};
+
+const getYearMonth = (): string => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
+
+const getMonthLabel = (): string => {
+  return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+
+const getWeekLabel = (): string => {
+  const dates = getWeekDates();
+  const start = new Date(dates[0] + 'T12:00:00');
+  const end = new Date(dates[6] + 'T12:00:00');
+  const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${startStr} – ${endStr}`;
 };
 
 const dayLabel = (dateStr: string) => {
@@ -239,6 +288,126 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
     }
     return count;
   }, [memberEntries]);
+
+  // ── Weekly goals (localStorage) ──
+  const weekStart = useMemo(() => getWeekStart(), []);
+  const weekLsKey = `amphibian-dashboard-week-${currentUser}-${weekStart}`;
+  const [weeklyData, setWeeklyDataState] = useState<WeeklyData>({ goals: [] });
+  const [newWeeklyGoal, setNewWeeklyGoal] = useState('');
+  const [editingWeeklyGoalId, setEditingWeeklyGoalId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(weekLsKey);
+      if (stored) setWeeklyDataState(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, [weekLsKey]);
+
+  const saveWeeklyData = (next: WeeklyData) => {
+    setWeeklyDataState(next);
+    try { localStorage.setItem(weekLsKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const addWeeklyGoal = () => {
+    if (!newWeeklyGoal.trim()) return;
+    const goal: WeeklyGoal = { id: `wg-${Date.now()}`, text: newWeeklyGoal.trim(), status: 'pending' };
+    saveWeeklyData({ goals: [...weeklyData.goals, goal] });
+    setNewWeeklyGoal('');
+  };
+
+  const cycleWeeklyGoalStatus = (goalId: string) => {
+    const statusCycle: CommitmentStatus[] = ['pending', 'completed', 'partial', 'missed'];
+    const goals = weeklyData.goals.map((g) => {
+      if (g.id !== goalId) return g;
+      const currentIdx = statusCycle.indexOf(g.status);
+      return { ...g, status: statusCycle[(currentIdx + 1) % statusCycle.length] };
+    });
+    saveWeeklyData({ goals });
+  };
+
+  const removeWeeklyGoal = (goalId: string) => {
+    saveWeeklyData({ goals: weeklyData.goals.filter((g) => g.id !== goalId) });
+  };
+
+  const updateWeeklyGoalText = (goalId: string, newText: string) => {
+    if (!newText.trim()) {
+      setEditingWeeklyGoalId(null);
+      return;
+    }
+    const goals = weeklyData.goals.map((g) =>
+      g.id === goalId ? { ...g, text: newText.trim() } : g
+    );
+    saveWeeklyData({ goals });
+    setEditingWeeklyGoalId(null);
+  };
+
+  // ── Weekly summary stats ──
+  const weeklyCompletionRate = useMemo(() => {
+    if (weeklyData.goals.length === 0) return 0;
+    const completed = weeklyData.goals.filter((g) => g.status === 'completed').length;
+    const partial = weeklyData.goals.filter((g) => g.status === 'partial').length;
+    return Math.round(((completed + partial * 0.5) / weeklyData.goals.length) * 100);
+  }, [weeklyData.goals]);
+
+  // ── Monthly goals (localStorage) ──
+  const yearMonth = useMemo(() => getYearMonth(), []);
+  const monthLsKey = `amphibian-dashboard-month-${currentUser}-${yearMonth}`;
+  const [monthlyData, setMonthlyDataState] = useState<MonthlyData>({ goals: [] });
+  const [newMonthlyGoal, setNewMonthlyGoal] = useState('');
+  const [editingMonthlyGoalId, setEditingMonthlyGoalId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(monthLsKey);
+      if (stored) setMonthlyDataState(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, [monthLsKey]);
+
+  const saveMonthlyData = (next: MonthlyData) => {
+    setMonthlyDataState(next);
+    try { localStorage.setItem(monthLsKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const addMonthlyGoal = () => {
+    if (!newMonthlyGoal.trim()) return;
+    const goal: MonthlyGoal = { id: `mg-${Date.now()}`, text: newMonthlyGoal.trim(), status: 'pending' };
+    saveMonthlyData({ goals: [...monthlyData.goals, goal] });
+    setNewMonthlyGoal('');
+  };
+
+  const cycleMonthlyGoalStatus = (goalId: string) => {
+    const statusCycle: CommitmentStatus[] = ['pending', 'completed', 'partial', 'missed'];
+    const goals = monthlyData.goals.map((g) => {
+      if (g.id !== goalId) return g;
+      const currentIdx = statusCycle.indexOf(g.status);
+      return { ...g, status: statusCycle[(currentIdx + 1) % statusCycle.length] };
+    });
+    saveMonthlyData({ goals });
+  };
+
+  const removeMonthlyGoal = (goalId: string) => {
+    saveMonthlyData({ goals: monthlyData.goals.filter((g) => g.id !== goalId) });
+  };
+
+  const updateMonthlyGoalText = (goalId: string, newText: string) => {
+    if (!newText.trim()) {
+      setEditingMonthlyGoalId(null);
+      return;
+    }
+    const goals = monthlyData.goals.map((g) =>
+      g.id === goalId ? { ...g, text: newText.trim() } : g
+    );
+    saveMonthlyData({ goals });
+    setEditingMonthlyGoalId(null);
+  };
+
+  // ── Monthly summary stats ──
+  const monthlyCompletionRate = useMemo(() => {
+    if (monthlyData.goals.length === 0) return 0;
+    const completed = monthlyData.goals.filter((g) => g.status === 'completed').length;
+    const partial = monthlyData.goals.filter((g) => g.status === 'partial').length;
+    return Math.round(((completed + partial * 0.5) / monthlyData.goals.length) * 100);
+  }, [monthlyData.goals]);
 
   // ── Commitment handlers ──
   const addCommitment = () => {
@@ -487,76 +656,285 @@ export function DashboardView({ onNavigate, currentUser }: DashboardViewProps) {
 
           {/* ── WEEK TAB ── */}
           {focusTab === 'week' && (
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-accent" />
-                Weekly Overview
-              </h3>
-              <div className="grid grid-cols-7 gap-2">
-                {weekDates.map((date) => {
-                  const entry = memberEntries.find((e) => e.date === date);
-                  const hitRate = getHitRate(entry);
-                  const isToday = date === todayDate;
-                  const count = entry?.commitments.length ?? 0;
-                  return (
+            <div className="space-y-6">
+              {/* Weekly Goals */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-accent" />
+                    Weekly Goals
+                    <span className="text-xs font-normal text-text-muted">({getWeekLabel()})</span>
+                  </h3>
+                  {weeklyData.goals.length > 0 && (
+                    <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                      weeklyCompletionRate >= 75 ? 'bg-emerald-500/15 text-emerald-400' :
+                      weeklyCompletionRate >= 25 ? 'bg-amber-500/15 text-amber-400' :
+                      'bg-white/10 text-text-muted'
+                    }`}>
+                      {weeklyCompletionRate}% complete
+                    </span>
+                  )}
+                </div>
+
+                {weeklyData.goals.length === 0 && (
+                  <p className="text-sm text-text-muted italic">No weekly goals set yet. Add your goals for the week below.</p>
+                )}
+
+                <div className="space-y-2">
+                  {weeklyData.goals.map((g, i) => (
                     <div
-                      key={date}
-                      className={`text-center p-3 rounded-lg border transition-colors ${
-                        isToday ? 'border-accent/50 bg-accent/5' : 'border-border/50 bg-surface-2/30'
-                      }`}
+                      key={g.id}
+                      className="group flex items-center gap-3 bg-surface-2/50 border border-border/50 rounded-lg px-4 py-3 hover:border-border transition-colors"
                     >
-                      <p className={`text-[10px] uppercase font-semibold tracking-wider mb-2 ${isToday ? 'text-accent' : 'text-text-muted'}`}>
-                        {dayLabel(date).split(',')[0]}
-                      </p>
-                      {count > 0 ? (
-                        <>
-                          <p className={`text-lg font-bold ${
-                            hitRate >= 75 ? 'text-emerald-400' : hitRate >= 25 ? 'text-amber-400' : 'text-text-muted'
-                          }`}>
-                            {hitRate}%
-                          </p>
-                          <p className="text-[10px] text-text-muted mt-0.5">{count} item{count !== 1 ? 's' : ''}</p>
-                        </>
+                      <span className="text-xs font-mono text-text-muted/50 w-4">{i + 1}</span>
+                      <button onClick={() => cycleWeeklyGoalStatus(g.id)} className="flex-shrink-0 hover:scale-110 transition-transform">
+                        {commitStatusIcon(g.status)}
+                      </button>
+                      {editingWeeklyGoalId === g.id ? (
+                        <input
+                          autoFocus
+                          defaultValue={g.text}
+                          className="flex-1 bg-white/5 border border-accent/30 rounded-md px-2 py-1 text-sm text-text-primary outline-none focus:border-accent/60 transition-colors"
+                          onBlur={(e) => updateWeeklyGoalText(g.id, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') updateWeeklyGoalText(g.id, e.currentTarget.value);
+                            if (e.key === 'Escape') setEditingWeeklyGoalId(null);
+                          }}
+                        />
                       ) : (
-                        <p className="text-lg font-bold text-text-muted/30">—</p>
+                        <span
+                          onClick={() => setEditingWeeklyGoalId(g.id)}
+                          className={`flex-1 text-sm cursor-text hover:bg-white/5 rounded-md px-2 py-1 -mx-2 transition-colors ${
+                            g.status === 'completed' ? 'text-text-muted line-through' : 'text-text-primary'
+                          }`}
+                          title="Click to edit"
+                        >
+                          {g.text}
+                        </span>
                       )}
+                      <button
+                        onClick={() => removeWeeklyGoal(g.id)}
+                        className="p-1 text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-rose-400 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    value={newWeeklyGoal}
+                    onChange={(e) => setNewWeeklyGoal(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addWeeklyGoal(); }}
+                    placeholder={`Weekly goal ${weeklyData.goals.length + 1}...`}
+                    className="flex-1 bg-white/5 border border-border rounded-lg px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 outline-none focus:border-teal-500/50 transition-colors"
+                  />
+                  <button
+                    onClick={addWeeklyGoal}
+                    disabled={!newWeeklyGoal.trim()}
+                    className="px-4 py-2.5 bg-accent/20 text-accent rounded-lg text-sm font-medium hover:bg-accent/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Weekly Summary Stats */}
+              {weeklyData.goals.length > 0 && (
+                <div className="flex items-center gap-4 px-4 py-3 bg-surface-2/30 border border-border/50 rounded-lg">
+                  <div className="text-center flex-1">
+                    <p className="text-lg font-bold text-text-primary">{weeklyData.goals.length}</p>
+                    <p className="text-[10px] text-text-muted uppercase tracking-wide">Goals</p>
+                  </div>
+                  <div className="w-px h-8 bg-border/50" />
+                  <div className="text-center flex-1">
+                    <p className={`text-lg font-bold ${
+                      weeklyCompletionRate >= 75 ? 'text-emerald-400' : weeklyCompletionRate >= 25 ? 'text-amber-400' : 'text-text-muted'
+                    }`}>{weeklyCompletionRate}%</p>
+                    <p className="text-[10px] text-text-muted uppercase tracking-wide">Completion</p>
+                  </div>
+                  <div className="w-px h-8 bg-border/50" />
+                  <div className="text-center flex-1">
+                    <p className="text-lg font-bold text-text-primary">{streak > 0 ? streak : '—'}</p>
+                    <p className="text-[10px] text-text-muted uppercase tracking-wide">Day Streak</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Daily Breakdown */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Daily Breakdown</p>
+                <div className="grid grid-cols-7 gap-2">
+                  {weekDates.map((date) => {
+                    const entry = memberEntries.find((e) => e.date === date);
+                    const hitRate = getHitRate(entry);
+                    const isToday = date === todayDate;
+                    const count = entry?.commitments.length ?? 0;
+                    return (
+                      <div
+                        key={date}
+                        className={`text-center p-3 rounded-lg border transition-colors ${
+                          isToday ? 'border-accent/50 bg-accent/5' : 'border-border/50 bg-surface-2/30'
+                        }`}
+                      >
+                        <p className={`text-[10px] uppercase font-semibold tracking-wider mb-2 ${isToday ? 'text-accent' : 'text-text-muted'}`}>
+                          {dayLabel(date).split(',')[0]}
+                        </p>
+                        {count > 0 ? (
+                          <>
+                            <p className={`text-lg font-bold ${
+                              hitRate >= 75 ? 'text-emerald-400' : hitRate >= 25 ? 'text-amber-400' : 'text-text-muted'
+                            }`}>
+                              {hitRate}%
+                            </p>
+                            <p className="text-[10px] text-text-muted mt-0.5">{count} item{count !== 1 ? 's' : ''}</p>
+                          </>
+                        ) : (
+                          <p className="text-lg font-bold text-text-muted/30">—</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
 
           {/* ── MONTH TAB ── */}
           {focusTab === 'month' && (
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
-                <CalendarRange className="w-4 h-4 text-accent" />
-                Monthly Milestones
-              </h3>
-              <p className="text-xs text-text-muted">Your OKR key results and their progress this quarter.</p>
-              {myOkrs.length > 0 ? (
-                <div className="space-y-3">
-                  {myOkrs.map((okr) =>
-                    okr.myKeyResults.map((kr, i) => (
-                      <div key={`${okr.id}-${i}`} className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-text-primary">{kr.text}</span>
-                          <span className="text-xs font-mono text-text-muted">{kr.progress}%</span>
-                        </div>
-                        <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{ width: `${kr.progress}%`, background: okrBarColor(okr.status) }}
-                          />
-                        </div>
-                      </div>
-                    ))
+            <div className="space-y-6">
+              {/* Monthly Goals */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                    <CalendarRange className="w-4 h-4 text-accent" />
+                    Monthly Goals
+                    <span className="text-xs font-normal text-text-muted">({getMonthLabel()})</span>
+                  </h3>
+                  {monthlyData.goals.length > 0 && (
+                    <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                      monthlyCompletionRate >= 75 ? 'bg-emerald-500/15 text-emerald-400' :
+                      monthlyCompletionRate >= 25 ? 'bg-amber-500/15 text-amber-400' :
+                      'bg-white/10 text-text-muted'
+                    }`}>
+                      {monthlyCompletionRate}% complete
+                    </span>
                   )}
                 </div>
-              ) : (
-                <p className="text-sm text-text-muted italic">No OKR key results assigned to you yet.</p>
+
+                {monthlyData.goals.length === 0 && (
+                  <p className="text-sm text-text-muted italic">No monthly goals set yet. Add your milestones for the month below.</p>
+                )}
+
+                <div className="space-y-2">
+                  {monthlyData.goals.map((g, i) => (
+                    <div
+                      key={g.id}
+                      className="group flex items-center gap-3 bg-surface-2/50 border border-border/50 rounded-lg px-4 py-3 hover:border-border transition-colors"
+                    >
+                      <span className="text-xs font-mono text-text-muted/50 w-4">{i + 1}</span>
+                      <button onClick={() => cycleMonthlyGoalStatus(g.id)} className="flex-shrink-0 hover:scale-110 transition-transform">
+                        {commitStatusIcon(g.status)}
+                      </button>
+                      {editingMonthlyGoalId === g.id ? (
+                        <input
+                          autoFocus
+                          defaultValue={g.text}
+                          className="flex-1 bg-white/5 border border-accent/30 rounded-md px-2 py-1 text-sm text-text-primary outline-none focus:border-accent/60 transition-colors"
+                          onBlur={(e) => updateMonthlyGoalText(g.id, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') updateMonthlyGoalText(g.id, e.currentTarget.value);
+                            if (e.key === 'Escape') setEditingMonthlyGoalId(null);
+                          }}
+                        />
+                      ) : (
+                        <span
+                          onClick={() => setEditingMonthlyGoalId(g.id)}
+                          className={`flex-1 text-sm cursor-text hover:bg-white/5 rounded-md px-2 py-1 -mx-2 transition-colors ${
+                            g.status === 'completed' ? 'text-text-muted line-through' : 'text-text-primary'
+                          }`}
+                          title="Click to edit"
+                        >
+                          {g.text}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => removeMonthlyGoal(g.id)}
+                        className="p-1 text-text-muted/30 opacity-0 group-hover:opacity-100 hover:text-rose-400 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    value={newMonthlyGoal}
+                    onChange={(e) => setNewMonthlyGoal(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addMonthlyGoal(); }}
+                    placeholder={`Monthly goal ${monthlyData.goals.length + 1}...`}
+                    className="flex-1 bg-white/5 border border-border rounded-lg px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 outline-none focus:border-teal-500/50 transition-colors"
+                  />
+                  <button
+                    onClick={addMonthlyGoal}
+                    disabled={!newMonthlyGoal.trim()}
+                    className="px-4 py-2.5 bg-accent/20 text-accent rounded-lg text-sm font-medium hover:bg-accent/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Monthly Summary Stats */}
+              {monthlyData.goals.length > 0 && (
+                <div className="flex items-center gap-4 px-4 py-3 bg-surface-2/30 border border-border/50 rounded-lg">
+                  <div className="text-center flex-1">
+                    <p className="text-lg font-bold text-text-primary">{monthlyData.goals.length}</p>
+                    <p className="text-[10px] text-text-muted uppercase tracking-wide">Goals Set</p>
+                  </div>
+                  <div className="w-px h-8 bg-border/50" />
+                  <div className="text-center flex-1">
+                    <p className={`text-lg font-bold ${
+                      monthlyCompletionRate >= 75 ? 'text-emerald-400' : monthlyCompletionRate >= 25 ? 'text-amber-400' : 'text-text-muted'
+                    }`}>{monthlyCompletionRate}%</p>
+                    <p className="text-[10px] text-text-muted uppercase tracking-wide">Completion</p>
+                  </div>
+                  <div className="w-px h-8 bg-border/50" />
+                  <div className="text-center flex-1">
+                    <p className="text-lg font-bold text-emerald-400">{monthlyData.goals.filter((g) => g.status === 'completed').length}</p>
+                    <p className="text-[10px] text-text-muted uppercase tracking-wide">Done</p>
+                  </div>
+                </div>
               )}
+
+              {/* OKR Key Results Progress */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">OKR Key Results</p>
+                {myOkrs.length > 0 ? (
+                  <div className="space-y-3">
+                    {myOkrs.map((okr) =>
+                      okr.myKeyResults.map((kr, i) => (
+                        <div key={`${okr.id}-${i}`} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-text-primary">{kr.text}</span>
+                            <span className="text-xs font-mono text-text-muted">{kr.progress}%</span>
+                          </div>
+                          <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700"
+                              style={{ width: `${kr.progress}%`, background: okrBarColor(okr.status) }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-muted italic">No OKR key results assigned to you yet.</p>
+                )}
+              </div>
             </div>
           )}
         </div>
