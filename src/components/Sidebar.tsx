@@ -27,10 +27,11 @@ import {
   Network,
   UserCheck,
   BookOpen,
+  Settings,
 } from 'lucide-react';
 import { teamMembers } from '@/lib/data';
 
-type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal';
+type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal' | 'settings';
 
 interface SidebarProps {
   currentView: string;
@@ -64,6 +65,7 @@ const navItems: { label: string; icon: React.ElementType; view: ViewType; group:
   { label: 'Competitive Intel', icon: Radar, view: 'competitive-intel', group: 4 },
   { label: 'Knowledge Graph', icon: Network, view: 'knowledge-graph', group: 4 },
   { label: 'Role Drift', icon: UserCheck, view: 'role-drift', group: 4 },
+  { label: 'Settings', icon: Settings, view: 'settings', group: 5 },
 ];
 
 export function Sidebar({

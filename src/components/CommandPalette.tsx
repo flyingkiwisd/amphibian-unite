@@ -24,6 +24,7 @@ import {
   Network,
   UserCheck,
   BookOpen,
+  Settings,
 } from 'lucide-react';
 import { teamMembers, agents, okrs, kpis } from '@/lib/data';
 
@@ -194,6 +195,14 @@ const navigationItems: SearchResult[] = [
     subtitle: 'Seat description vs actual work analysis',
     category: 'Navigation',
     action: 'role-drift',
+  },
+  {
+    id: 'nav-settings',
+    icon: <Settings className="w-4 h-4" />,
+    title: 'Settings & Profile',
+    subtitle: 'Your operating system, qualities, feedback, and preferences',
+    category: 'Navigation',
+    action: 'settings',
   },
 ];
 

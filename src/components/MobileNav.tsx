@@ -25,10 +25,11 @@ import {
   Network,
   UserCheck,
   BookOpen,
+  Settings,
 } from 'lucide-react';
 import { useState } from 'react';
 
-type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal';
+type ViewType = 'dashboard' | 'agents' | 'team' | 'okrs' | 'tasks' | 'roadmap' | 'ai-edge' | 'decisions' | 'notes' | 'activity' | 'leaderboard' | 'accountability' | 'founder-alignment' | 'meeting-intel' | 'what-changed' | 'peer-feedback' | 'cash-runway' | 'lp-health' | 'competitive-intel' | 'knowledge-graph' | 'role-drift' | 'journal' | 'settings';
 
 interface MobileNavProps {
   currentView: string;
@@ -62,6 +63,7 @@ const moreTabs: { label: string; icon: React.ElementType; view: ViewType }[] = [
   { label: 'Competitive Intel', icon: Radar, view: 'competitive-intel' },
   { label: 'Knowledge Graph', icon: Network, view: 'knowledge-graph' },
   { label: 'Role Drift', icon: UserCheck, view: 'role-drift' },
+  { label: 'Settings', icon: Settings, view: 'settings' },
 ];
 
 export function MobileNav({ currentView, onViewChange, onOpenSearch }: MobileNavProps) {
